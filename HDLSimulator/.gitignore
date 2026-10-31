@@ -1,0 +1,7 @@
+.build/
+build/
+sim_out/
+examples/*_sim/
+*.vcd
+*.vvp
+.DS_Store

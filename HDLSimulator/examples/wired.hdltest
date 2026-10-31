@@ -1,0 +1,890 @@
+{
+  "format" : "hdltester-test",
+  "savedDir" : "/Users/emman/Desktop/HDLSimulator/examples",
+  "sources" : [
+    "/Users/emman/Desktop/HDLSimulator/examples/counter.v",
+    "/Users/emman/Desktop/HDLSimulator/examples/uart_tx.v",
+    "/Users/emman/Desktop/HDLSimulator/examples/adder.v",
+    "/Users/emman/Desktop/HDLSimulator/examples/shift_detect.sv"
+  ],
+  "test" : {
+    "autoOpenVCD" : true,
+    "duration" : 1200,
+    "instances" : [
+      {
+        "filePath" : "",
+        "id" : "2A5D8FB9-D577-40F2-A212-15673A2A2B53",
+        "kind" : "source",
+        "logged" : [
+
+        ],
+        "moduleName" : "",
+        "name" : "clk",
+        "paramOverrides" : {
+
+        },
+        "params" : [
+
+        ],
+        "ports" : [
+          {
+            "dataType" : "reg",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "out",
+            "ranges" : [
+
+            ]
+          }
+        ],
+        "stimuli" : {
+          "out" : {
+            "absoluteTimes" : false,
+            "bitDelay" : 0,
+            "bitIdle" : "0",
+            "bitRepeat" : false,
+            "bitTime" : 10,
+            "bits" : "10110010",
+            "clockDelay" : 0,
+            "constant" : "0",
+            "countDelay" : 0,
+            "countInterval" : 10,
+            "countStart" : "0",
+            "countStep" : "1",
+            "duty" : 50,
+            "kind" : "clock",
+            "period" : 10,
+            "randDelay" : 0,
+            "randInterval" : 10,
+            "randSeed" : 1,
+            "seqInitial" : "0",
+            "seqRepeat" : false,
+            "startHigh" : false,
+            "steps" : [
+
+            ]
+          }
+        },
+        "x" : 20,
+        "y" : 60
+      },
+      {
+        "filePath" : "",
+        "id" : "130E35E6-F24F-467C-8C3B-4CA58367DE7C",
+        "kind" : "source",
+        "logged" : [
+
+        ],
+        "moduleName" : "",
+        "name" : "rst_n",
+        "paramOverrides" : {
+
+        },
+        "params" : [
+
+        ],
+        "ports" : [
+          {
+            "dataType" : "reg",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "out",
+            "ranges" : [
+
+            ]
+          }
+        ],
+        "stimuli" : {
+          "out" : {
+            "absoluteTimes" : false,
+            "bitDelay" : 0,
+            "bitIdle" : "0",
+            "bitRepeat" : false,
+            "bitTime" : 10,
+            "bits" : "10110010",
+            "clockDelay" : 0,
+            "constant" : "0",
+            "countDelay" : 0,
+            "countInterval" : 10,
+            "countStart" : "0",
+            "countStep" : "1",
+            "duty" : 50,
+            "kind" : "sequence",
+            "period" : 10,
+            "randDelay" : 0,
+            "randInterval" : 10,
+            "randSeed" : 1,
+            "seqInitial" : "0",
+            "seqRepeat" : false,
+            "startHigh" : false,
+            "steps" : [
+              {
+                "delay" : 20,
+                "id" : "1AF98B55-4F87-4137-8A3F-8F6B685E8DB5",
+                "value" : "1"
+              }
+            ]
+          }
+        },
+        "x" : 20,
+        "y" : 140
+      },
+      {
+        "filePath" : "",
+        "id" : "146E7FDE-C563-4E4B-985B-77D89C1215AE",
+        "kind" : "source",
+        "logged" : [
+
+        ],
+        "moduleName" : "",
+        "name" : "rst",
+        "paramOverrides" : {
+
+        },
+        "params" : [
+
+        ],
+        "ports" : [
+          {
+            "dataType" : "reg",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "out",
+            "ranges" : [
+
+            ]
+          }
+        ],
+        "stimuli" : {
+          "out" : {
+            "absoluteTimes" : false,
+            "bitDelay" : 0,
+            "bitIdle" : "0",
+            "bitRepeat" : false,
+            "bitTime" : 10,
+            "bits" : "10110010",
+            "clockDelay" : 0,
+            "constant" : "0",
+            "countDelay" : 0,
+            "countInterval" : 10,
+            "countStart" : "0",
+            "countStep" : "1",
+            "duty" : 50,
+            "kind" : "sequence",
+            "period" : 10,
+            "randDelay" : 0,
+            "randInterval" : 10,
+            "randSeed" : 1,
+            "seqInitial" : "1",
+            "seqRepeat" : false,
+            "startHigh" : false,
+            "steps" : [
+              {
+                "delay" : 20,
+                "id" : "BDDB7145-57D4-467F-BEF2-330B59A0FA87",
+                "value" : "0"
+              }
+            ]
+          }
+        },
+        "x" : 20,
+        "y" : 220
+      },
+      {
+        "filePath" : "",
+        "id" : "4482485E-5FE0-476C-9BD4-38F943DBE46C",
+        "kind" : "source",
+        "logged" : [
+
+        ],
+        "moduleName" : "",
+        "name" : "data",
+        "paramOverrides" : {
+
+        },
+        "params" : [
+
+        ],
+        "ports" : [
+          {
+            "dataType" : "reg",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "out",
+            "ranges" : [
+              {
+                "lsb" : "0",
+                "msb" : "7"
+              }
+            ]
+          }
+        ],
+        "stimuli" : {
+          "out" : {
+            "absoluteTimes" : false,
+            "bitDelay" : 0,
+            "bitIdle" : "0",
+            "bitRepeat" : false,
+            "bitTime" : 10,
+            "bits" : "10110010",
+            "clockDelay" : 0,
+            "constant" : "0",
+            "countDelay" : 0,
+            "countInterval" : 160,
+            "countStart" : "8'hA5",
+            "countStep" : "8'h11",
+            "duty" : 50,
+            "kind" : "counter",
+            "period" : 10,
+            "randDelay" : 0,
+            "randInterval" : 10,
+            "randSeed" : 1,
+            "seqInitial" : "0",
+            "seqRepeat" : false,
+            "startHigh" : false,
+            "steps" : [
+
+            ]
+          }
+        },
+        "x" : 20,
+        "y" : 300
+      },
+      {
+        "filePath" : "/Users/emman/Desktop/HDLSimulator/examples/counter.v",
+        "id" : "C28FF91B-F8AD-4A0F-BC2B-9D8EBF9AEA6C",
+        "kind" : "dut",
+        "logged" : [
+          "wrap"
+        ],
+        "moduleName" : "counter",
+        "name" : "u_counter",
+        "paramOverrides" : {
+          "WIDTH" : "4"
+        },
+        "params" : [
+          {
+            "isLocal" : false,
+            "name" : "WIDTH",
+            "value" : "8"
+          }
+        ],
+        "ports" : [
+          {
+            "dataType" : "wire",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "clk",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "wire",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "rst_n",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "wire",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "en",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "reg",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "count",
+            "ranges" : [
+              {
+                "lsb" : "0",
+                "msb" : "WIDTH-1"
+              }
+            ]
+          },
+          {
+            "dataType" : "wire",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "wrap",
+            "ranges" : [
+
+            ]
+          }
+        ],
+        "stimuli" : {
+
+        },
+        "x" : 340,
+        "y" : 60
+      },
+      {
+        "filePath" : "/Users/emman/Desktop/HDLSimulator/examples/uart_tx.v",
+        "id" : "06B5190D-4116-4B7D-8EEC-20382C9976C5",
+        "kind" : "dut",
+        "logged" : [
+          "busy"
+        ],
+        "moduleName" : "uart_tx",
+        "name" : "u_uart",
+        "paramOverrides" : {
+          "CLKS_PER_BIT" : "1"
+        },
+        "params" : [
+          {
+            "isLocal" : false,
+            "name" : "CLKS_PER_BIT",
+            "value" : "4"
+          },
+          {
+            "isLocal" : true,
+            "name" : "CW",
+            "value" : "$clog2(CLKS_PER_BIT)"
+          }
+        ],
+        "ports" : [
+          {
+            "dataType" : "wire",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "clk",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "wire",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "rst",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "wire",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "start",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "wire",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "data",
+            "ranges" : [
+              {
+                "lsb" : "0",
+                "msb" : "7"
+              }
+            ]
+          },
+          {
+            "dataType" : "reg",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "tx",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "reg",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "busy",
+            "ranges" : [
+
+            ]
+          }
+        ],
+        "stimuli" : {
+
+        },
+        "x" : 340,
+        "y" : 280
+      },
+      {
+        "filePath" : "/Users/emman/Desktop/HDLSimulator/examples/adder.v",
+        "id" : "A26B3C4B-E74F-41E9-96CD-3D8CB10FC58C",
+        "kind" : "dut",
+        "logged" : [
+          "cout"
+        ],
+        "moduleName" : "ripple_adder",
+        "name" : "u_adder",
+        "paramOverrides" : {
+
+        },
+        "params" : [
+
+        ],
+        "ports" : [
+          {
+            "dataType" : "",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "a",
+            "ranges" : [
+              {
+                "lsb" : "0",
+                "msb" : "4-1"
+              }
+            ]
+          },
+          {
+            "dataType" : "",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "b",
+            "ranges" : [
+              {
+                "lsb" : "0",
+                "msb" : "4-1"
+              }
+            ]
+          },
+          {
+            "dataType" : "",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "cin",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "sum",
+            "ranges" : [
+              {
+                "lsb" : "0",
+                "msb" : "4-1"
+              }
+            ]
+          },
+          {
+            "dataType" : "",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "cout",
+            "ranges" : [
+
+            ]
+          }
+        ],
+        "stimuli" : {
+
+        },
+        "x" : 690,
+        "y" : 60
+      },
+      {
+        "filePath" : "/Users/emman/Desktop/HDLSimulator/examples/shift_detect.sv",
+        "id" : "3171C96E-1A2E-4EDC-A9FE-4BE9FD1F7C51",
+        "kind" : "dut",
+        "logged" : [
+          "found"
+        ],
+        "moduleName" : "shift_detect",
+        "name" : "u_detect",
+        "paramOverrides" : {
+
+        },
+        "params" : [
+
+        ],
+        "ports" : [
+          {
+            "dataType" : "logic",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "clk",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "logic",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "rst_n",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "logic",
+            "dir" : "input",
+            "isSigned" : false,
+            "name" : "din",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "logic",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "found",
+            "ranges" : [
+
+            ]
+          },
+          {
+            "dataType" : "logic",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "window",
+            "ranges" : [
+              {
+                "lsb" : "0",
+                "msb" : "3"
+              }
+            ]
+          }
+        ],
+        "stimuli" : {
+
+        },
+        "x" : 690,
+        "y" : 300
+      },
+      {
+        "filePath" : "",
+        "id" : "CDFE43F4-30F8-4979-BE35-3C7D55D03267",
+        "kind" : "source",
+        "logged" : [
+
+        ],
+        "moduleName" : "",
+        "name" : "en",
+        "paramOverrides" : {
+
+        },
+        "params" : [
+
+        ],
+        "ports" : [
+          {
+            "dataType" : "reg",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "out",
+            "ranges" : [
+
+            ]
+          }
+        ],
+        "stimuli" : {
+          "out" : {
+            "absoluteTimes" : false,
+            "bitDelay" : 0,
+            "bitIdle" : "0",
+            "bitRepeat" : false,
+            "bitTime" : 10,
+            "bits" : "10110010",
+            "clockDelay" : 0,
+            "constant" : "1",
+            "countDelay" : 0,
+            "countInterval" : 10,
+            "countStart" : "0",
+            "countStep" : "1",
+            "duty" : 50,
+            "kind" : "constant",
+            "period" : 10,
+            "randDelay" : 0,
+            "randInterval" : 10,
+            "randSeed" : 1,
+            "seqInitial" : "0",
+            "seqRepeat" : false,
+            "startHigh" : false,
+            "steps" : [
+
+            ]
+          }
+        },
+        "x" : 20,
+        "y" : 370
+      },
+      {
+        "filePath" : "",
+        "id" : "1D5AEB8B-FC69-4AC0-8362-463551D6F994",
+        "kind" : "source",
+        "logged" : [
+
+        ],
+        "moduleName" : "",
+        "name" : "b",
+        "paramOverrides" : {
+
+        },
+        "params" : [
+
+        ],
+        "ports" : [
+          {
+            "dataType" : "reg",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "out",
+            "ranges" : [
+              {
+                "lsb" : "0",
+                "msb" : "3"
+              }
+            ]
+          }
+        ],
+        "stimuli" : {
+          "out" : {
+            "absoluteTimes" : false,
+            "bitDelay" : 0,
+            "bitIdle" : "0",
+            "bitRepeat" : false,
+            "bitTime" : 10,
+            "bits" : "10110010",
+            "clockDelay" : 0,
+            "constant" : "0",
+            "countDelay" : 0,
+            "countInterval" : 10,
+            "countStart" : "0",
+            "countStep" : "1",
+            "duty" : 50,
+            "kind" : "random",
+            "period" : 10,
+            "randDelay" : 0,
+            "randInterval" : 25,
+            "randSeed" : 5,
+            "seqInitial" : "0",
+            "seqRepeat" : false,
+            "startHigh" : false,
+            "steps" : [
+
+            ]
+          }
+        },
+        "x" : 20,
+        "y" : 440
+      },
+      {
+        "filePath" : "",
+        "id" : "9DBA707D-76B9-47E5-B116-88ACB2957E6B",
+        "kind" : "source",
+        "logged" : [
+
+        ],
+        "moduleName" : "",
+        "name" : "cin",
+        "paramOverrides" : {
+
+        },
+        "params" : [
+
+        ],
+        "ports" : [
+          {
+            "dataType" : "reg",
+            "dir" : "output",
+            "isSigned" : false,
+            "name" : "out",
+            "ranges" : [
+
+            ]
+          }
+        ],
+        "stimuli" : {
+          "out" : {
+            "absoluteTimes" : false,
+            "bitDelay" : 0,
+            "bitIdle" : "0",
+            "bitRepeat" : false,
+            "bitTime" : 10,
+            "bits" : "10110010",
+            "clockDelay" : 0,
+            "constant" : "0",
+            "countDelay" : 0,
+            "countInterval" : 10,
+            "countStart" : "0",
+            "countStep" : "1",
+            "duty" : 50,
+            "kind" : "constant",
+            "period" : 10,
+            "randDelay" : 0,
+            "randInterval" : 10,
+            "randSeed" : 1,
+            "seqInitial" : "0",
+            "seqRepeat" : false,
+            "startHigh" : false,
+            "steps" : [
+
+            ]
+          }
+        },
+        "x" : 20,
+        "y" : 510
+      }
+    ],
+    "name" : "Wired",
+    "precision" : "ps",
+    "unit" : "ns",
+    "wires" : [
+      {
+        "from" : {
+          "instance" : "2A5D8FB9-D577-40F2-A212-15673A2A2B53",
+          "pin" : "out"
+        },
+        "id" : "791E213A-AEF1-4AAF-93DE-8AA63B4290F6",
+        "to" : {
+          "instance" : "C28FF91B-F8AD-4A0F-BC2B-9D8EBF9AEA6C",
+          "pin" : "clk"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "130E35E6-F24F-467C-8C3B-4CA58367DE7C",
+          "pin" : "out"
+        },
+        "id" : "79FD717E-BDD2-45C4-9B23-5799DA95FB42",
+        "to" : {
+          "instance" : "C28FF91B-F8AD-4A0F-BC2B-9D8EBF9AEA6C",
+          "pin" : "rst_n"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "2A5D8FB9-D577-40F2-A212-15673A2A2B53",
+          "pin" : "out"
+        },
+        "id" : "117919EB-055D-41A2-AE8E-68CB8E1BF1D1",
+        "to" : {
+          "instance" : "06B5190D-4116-4B7D-8EEC-20382C9976C5",
+          "pin" : "clk"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "146E7FDE-C563-4E4B-985B-77D89C1215AE",
+          "pin" : "out"
+        },
+        "id" : "62AC0531-D599-479D-86BA-631B18CA00DD",
+        "to" : {
+          "instance" : "06B5190D-4116-4B7D-8EEC-20382C9976C5",
+          "pin" : "rst"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "C28FF91B-F8AD-4A0F-BC2B-9D8EBF9AEA6C",
+          "pin" : "wrap"
+        },
+        "id" : "4FE6F6BA-8C7D-4922-8537-ECCB3A4E85D5",
+        "to" : {
+          "instance" : "06B5190D-4116-4B7D-8EEC-20382C9976C5",
+          "pin" : "start"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "4482485E-5FE0-476C-9BD4-38F943DBE46C",
+          "pin" : "out"
+        },
+        "id" : "2E3814FB-E5BB-44A6-98B3-90F4BDFB3539",
+        "to" : {
+          "instance" : "06B5190D-4116-4B7D-8EEC-20382C9976C5",
+          "pin" : "data"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "2A5D8FB9-D577-40F2-A212-15673A2A2B53",
+          "pin" : "out"
+        },
+        "id" : "584C2556-E199-4C51-84A0-800BEEE06AFD",
+        "to" : {
+          "instance" : "3171C96E-1A2E-4EDC-A9FE-4BE9FD1F7C51",
+          "pin" : "clk"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "130E35E6-F24F-467C-8C3B-4CA58367DE7C",
+          "pin" : "out"
+        },
+        "id" : "D1FE149F-423D-402C-914D-7D72476A2A8B",
+        "to" : {
+          "instance" : "3171C96E-1A2E-4EDC-A9FE-4BE9FD1F7C51",
+          "pin" : "rst_n"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "06B5190D-4116-4B7D-8EEC-20382C9976C5",
+          "pin" : "tx"
+        },
+        "id" : "C57306F3-1741-459C-A5F6-E32D8B83CD3F",
+        "to" : {
+          "instance" : "3171C96E-1A2E-4EDC-A9FE-4BE9FD1F7C51",
+          "pin" : "din"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "C28FF91B-F8AD-4A0F-BC2B-9D8EBF9AEA6C",
+          "pin" : "count"
+        },
+        "id" : "AB587E4E-6C58-461C-B7B7-32C13DFF0B35",
+        "to" : {
+          "instance" : "A26B3C4B-E74F-41E9-96CD-3D8CB10FC58C",
+          "pin" : "a"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "CDFE43F4-30F8-4979-BE35-3C7D55D03267",
+          "pin" : "out"
+        },
+        "id" : "B4BE2DBD-BDEA-4523-B678-136FD061AEFA",
+        "to" : {
+          "instance" : "C28FF91B-F8AD-4A0F-BC2B-9D8EBF9AEA6C",
+          "pin" : "en"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "1D5AEB8B-FC69-4AC0-8362-463551D6F994",
+          "pin" : "out"
+        },
+        "id" : "BB1A4FDF-09C8-48D2-B634-5F9C346745F1",
+        "to" : {
+          "instance" : "A26B3C4B-E74F-41E9-96CD-3D8CB10FC58C",
+          "pin" : "b"
+        }
+      },
+      {
+        "from" : {
+          "instance" : "9DBA707D-76B9-47E5-B116-88ACB2957E6B",
+          "pin" : "out"
+        },
+        "id" : "456030A4-CE2D-4719-A057-A91B9E1FA61C",
+        "to" : {
+          "instance" : "A26B3C4B-E74F-41E9-96CD-3D8CB10FC58C",
+          "pin" : "cin"
+        }
+      }
+    ]
+  },
+  "version" : 1
+}

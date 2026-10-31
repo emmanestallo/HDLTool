@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>HDL Simulator</string>
+    <key>CFBundleDisplayName</key>
+    <string>HDL Simulator</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.emman.hdlsimulator</string>
+    <key>CFBundleExecutable</key>
+    <string>HDLSimulator</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>15.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.developer-tools</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>HDL Tester Test</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array><string>com.emman.hdltester.test</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Verilog Source</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Default</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.emman.hdlcoder.verilog</string>
+                <string>com.emman.hdltester.verilog</string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array><string>v</string><string>sv</string><string>vh</string><string>svh</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>VHDL Source</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Default</string>
+            <key>LSItemContentTypes</key>
+            <array><string>com.emman.hdlcoder.vhdl</string></array>
+            <key>CFBundleTypeExtensions</key>
+            <array><string>vhd</string><string>vhdl</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Folder</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array><string>public.folder</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Text</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array><string>public.plain-text</string><string>public.source-code</string></array>
+        </dict>
+    </array>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.emman.hdltester.test</string>
+            <key>UTTypeDescription</key>
+            <string>HDL Tester test</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.json</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array><string>hdltest</string></array>
+            </dict>
+        </dict>
+    </array>
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.emman.hdlcoder.verilog</string>
+            <key>UTTypeDescription</key>
+            <string>Verilog source</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.plain-text</string><string>public.source-code</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array><string>v</string><string>sv</string><string>vh</string><string>svh</string></array>
+            </dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.emman.hdlcoder.vhdl</string>
+            <key>UTTypeDescription</key>
+            <string>VHDL source</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.plain-text</string><string>public.source-code</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array><string>vhd</string><string>vhdl</string></array>
+            </dict>
+        </dict>
+    </array>
+</dict>
+</plist>
