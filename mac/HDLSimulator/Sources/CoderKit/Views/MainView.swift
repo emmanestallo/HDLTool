@@ -19,7 +19,7 @@ struct MainView: View {
                     SidebarView(mode: mode)
                         .frame(width: sidebarWidth)
                     ResizeDivider(color: theme.border) { dx in
-                        sidebarWidth = min(max(sidebarWidth + dx, 180), 600)
+                        sidebarWidth = min(max(sidebarWidth + Double(dx), 180), 600)
                     }
                 }
                 GeometryReader { geo in
@@ -27,7 +27,7 @@ struct MainView: View {
                         EditorArea()
                         if model.showPanel {
                             ResizeDivider(axis: .horizontal, color: theme.border) { dy in
-                                panelHeight = min(max(panelHeight - dy, 100), max(120, geo.size.height - 140))
+                                panelHeight = min(max(panelHeight - Double(dy), 100), max(120, Double(geo.size.height) - 140))
                             }
                             BottomPanel()
                                 .frame(height: min(panelHeight, max(120, geo.size.height - 140)))

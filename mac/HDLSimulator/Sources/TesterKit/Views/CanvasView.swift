@@ -14,7 +14,7 @@ struct TestCanvasView: View {
     @ViewState private var zoomAtGestureStart: Double?
 
     var body: some View {
-        let zoom = doc.zoom
+        let zoom = CGFloat(doc.zoom)   // CGFloat: it scales view geometry (see PinGeo.pins)
         let gen = model.generated(for: doc)
         let badPins = Set(gen.problems.filter { $0.severity == .error }.compactMap { p in
             p.instance.map { "\($0.uuidString).\(p.pin ?? "")" }
@@ -63,7 +63,7 @@ struct TestCanvasView: View {
             MagnifyGesture()
                 .onChanged { v in
                     if zoomAtGestureStart == nil { zoomAtGestureStart = doc.zoom }
-                    doc.zoom = min(2, max(0.4, (zoomAtGestureStart ?? 1) * v.magnification))
+                    doc.zoom = min(2, max(0.4, (zoomAtGestureStart ?? 1) * Double(v.magnification)))
                 }
                 .onEnded { _ in zoomAtGestureStart = nil }
         )
@@ -81,10 +81,10 @@ struct TestCanvasView: View {
     }
 
     private func canvasSize(viewport: CGSize, zoom: Double) -> CGSize {
-        var w = viewport.width / zoom, h = viewport.height / zoom
+        var w = viewport.width / CGFloat(zoom), h = viewport.height / CGFloat(zoom)
         for inst in doc.state.instances {
-            w = max(w, inst.x + 700)
-            h = max(h, inst.y + 500)
+            w = max(w, CGFloat(inst.x) + 700)
+            h = max(h, CGFloat(inst.y) + 500)
         }
         return CGSize(width: max(w, 1200), height: max(h, 800))
     }
@@ -220,7 +220,9 @@ enum PinGeo {
     }
 
     static func pins(of inst: DUTInstance, offset: CGSize = .zero) -> [Pin] {
-        let ox = inst.x + offset.width, oy = inst.y + offset.height
+        // Model positions are Double; convert once so no expression below mixes Double and CGFloat
+        // (some Swift versions reject a mixed `a + b + 12` inside CGRect(...) as ambiguous).
+        let ox = CGFloat(inst.x) + offset.width, oy = CGFloat(inst.y) + offset.height
         if inst.isSource {
             let L = SourceLayout(inst: inst)
             let pt = CGPoint(x: ox + L.boxW + SourceLayout.stub, y: oy + SourceLayout.pinY)
@@ -314,7 +316,7 @@ enum PinGeo {
     static func obstacles(_ state: TestState, dragging: DragState?) -> [CGRect] {
         state.instances.map { inst in
             let off = dragging?.id == inst.id ? dragging!.offset : .zero
-            let ox = inst.x + off.width, oy = inst.y + off.height
+            let ox = CGFloat(inst.x) + off.width, oy = CGFloat(inst.y) + off.height
             if inst.isSource {
                 let L = SourceLayout(inst: inst)
                 return CGRect(x: ox - 8, y: oy - 8, width: L.boxW + 24, height: L.boxH + 16)
@@ -514,7 +516,7 @@ struct WireLayer: View {
             for (_, junctions, a, b, color, width, _) in items {
                 ctx.fill(Path(ellipseIn: CGRect(x: a.x - 3.5, y: a.y - 3.5, width: 7, height: 7)), with: .color(color))
                 ctx.fill(Path(ellipseIn: CGRect(x: b.x - 3.5, y: b.y - 3.5, width: 7, height: 7)), with: .color(color))
-                let r = width > 2 ? 4.0 : 3.0
+                let r: CGFloat = width > 2 ? 4 : 3
                 for j in junctions {
                     ctx.fill(Path(ellipseIn: CGRect(x: j.x - r, y: j.y - r, width: 2 * r, height: 2 * r)), with: .color(color))
                 }
@@ -582,7 +584,7 @@ struct ConnectorDot: View {
             DragGesture(minimumDistance: 2, coordinateSpace: .named("canvas"))
                 .onChanged { v in
                     doc.updatePendingWire(start: ref, startIsOutput: isOutput,
-                                          point: CGPoint(x: v.location.x / zoom, y: v.location.y / zoom))
+                                          point: CGPoint(x: v.location.x / CGFloat(zoom), y: v.location.y / CGFloat(zoom)))
                 }
                 .onEnded { _ in doc.finishPendingWire() }
         )
@@ -609,13 +611,13 @@ struct MoveOnDrag: ViewModifier {
                 DragGesture(minimumDistance: 3, coordinateSpace: .named("canvas"))
                     .onChanged { v in
                         dragging = true
-                        drag = CGSize(width: v.translation.width / zoom, height: v.translation.height / zoom)
+                        drag = CGSize(width: v.translation.width / CGFloat(zoom), height: v.translation.height / CGFloat(zoom))
                         doc.dragging = DragState(id: inst.id, offset: drag)
                         if doc.selection?.instanceID != inst.id { doc.selection = .instance(inst.id) }
                     }
                     .onEnded { _ in
                         let snap = { (v: Double) in (v / 10).rounded() * 10 }
-                        let nx = max(minX, snap(inst.x + drag.width)), ny = max(minY, snap(inst.y + drag.height))
+                        let nx = max(minX, snap(inst.x + Double(drag.width))), ny = max(minY, snap(inst.y + Double(drag.height)))
                         drag = .zero
                         dragging = false
                         doc.dragging = nil
@@ -731,7 +733,7 @@ struct BlockView: View {
             }
         }
         .frame(width: L.totalW, height: L.totalH, alignment: .topLeading)
-        .offset(x: inst.x - L.leftW, y: inst.y - BlockLayout.labelH)
+        .offset(x: CGFloat(inst.x) - L.leftW, y: CGFloat(inst.y) - BlockLayout.labelH)
         .modifier(MoveOnDrag(doc: doc, inst: inst, zoom: zoom, minX: Double(L.leftW), minY: Double(BlockLayout.labelH + 4)))
     }
 

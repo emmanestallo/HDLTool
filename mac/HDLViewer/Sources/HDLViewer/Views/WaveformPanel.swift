@@ -124,12 +124,12 @@ struct WaveformPanel: View {
             }
             .padding(.horizontal, 10)
             .frame(width: nameWidth)
-            ResizeDivider(color: theme.border) { dx in nameWidth = min(max(nameWidth + dx, 100), 600) }
+            ResizeDivider(color: theme.border) { dx in nameWidth = min(max(nameWidth + Double(dx), 100), 600) }
             Text("VALUE")
                 .font(.system(size: 11, weight: .semibold))
                 .padding(.horizontal, 10)
                 .frame(width: valueWidth, alignment: .leading)
-            ResizeDivider(color: theme.border) { dx in valueWidth = min(max(valueWidth + dx, 60), 400) }
+            ResizeDivider(color: theme.border) { dx in valueWidth = min(max(valueWidth + Double(dx), 60), 400) }
             RulerView(doc: doc, file: file)
         }
         .foregroundStyle(theme.dimFG)

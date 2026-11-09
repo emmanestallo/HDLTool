@@ -17,7 +17,7 @@ struct MainView: View {
                     SidebarView()
                         .frame(width: sidebarWidth)
                     ResizeDivider(color: theme.border) { dx in
-                        sidebarWidth = min(max(sidebarWidth + dx, 180), 640)
+                        sidebarWidth = min(max(sidebarWidth + Double(dx), 180), 640)
                     }
                 }
                 EditorArea()
