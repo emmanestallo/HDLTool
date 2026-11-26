@@ -1,11 +1,12 @@
 # HDLTool
 
-Two desktop apps for writing, testing and viewing Verilog designs, styled after VS Code. Both run on macOS (native Swift) and Windows (Electron).
+Desktop apps for writing, testing and viewing Verilog designs, styled after VS Code. HDL Simulator and HDL Viewer run on macOS (native Swift), Windows and Linux (Electron); HDLPhy, which synthesizes and places and routes a design on SKY130, runs on Linux.
 
 | App | What it does |
 |---|---|
 | **HDL Simulator** | A Verilog/VHDL editor (**Coder**) and a visual testbench builder (**Tester**) in one window, as two tabs. Runs simulations with Icarus Verilog. |
 | **HDL Viewer** | A waveform viewer for VCD files, with digital and analog display. Kept as a separate app so it can sit on its own monitor. |
+| **HDLPhy** (Linux) | Synthesis (yosys) and place-and-route (OpenROAD) on SKY130 `sky130_fd_sc_hd`, with a **Schematic** tab after synthesis and a **Layout** tab after place and route. |
 
 ## HDL Simulator
 
@@ -33,7 +34,28 @@ Buses can be drawn as analog traces: unsigned (0 to 1), signed (−1 to +1) or a
 
 ![HDL Viewer, analog display](docs/screenshots/viewer-analog.png)
 
+## HDLPhy
+
+Open a folder of Verilog sources, pick the top module and the clock, and press **Run Flow**. The flow has six stages: synthesis, floorplan, placement, clock tree, routing and GDS.
+
+The two title-bar tabs show the result:
+
+- **Schematic.** The netlist drawn with gate symbols, either the elaborated RTL or the SKY130 gate-level netlist. You can select cells, highlight nets and open submodules.
+- **Layout.** The routed layout in the PDK's layer colors. It has layer toggles, cell outlines and names, and pin labels, and it can open the result in KLayout.
+
+The flow is also a command-line script. See [`linux/README.md`](linux/README.md).
+
 ## Install
+
+### Linux
+
+```bash
+cd linux
+./build_apps.sh --install      # HDL Simulator, HDL Viewer and HDLPhy into ~/.local (menu entries, commands)
+```
+
+This needs Node.js. HDL Simulator needs Icarus Verilog (`sudo apt install iverilog`). HDLPhy needs yosys, OpenROAD, KLayout and the sky130A PDK. In OpenSourceICD, `setup/install-eda-tools.sh digital` builds yosys, OpenROAD and Node.js into `~/eda/tools` without root. Details are in [`linux/README.md`](linux/README.md).
+
 
 ### Windows
 
@@ -63,6 +85,8 @@ cd mac/HDLSimulator
 |---|---|
 | [`mac/HDLSimulator`](mac/HDLSimulator) | macOS HDL Simulator (Swift). Its [README](mac/HDLSimulator/README.md) covers the tabs, testbench generation and descend/ascend. |
 | [`mac/HDLViewer`](mac/HDLViewer) | macOS HDL Viewer (Swift). Its [README](mac/HDLViewer/README.md) lists the shortcuts and the analog display options. |
+| [`linux/`](linux) | Linux apps (Electron): HDL Simulator and HDL Viewer (the Windows sources with Linux changes) and HDLPhy with its SKY130 flow ([README](linux/README.md)). |
+| `windows/` | Windows installers. |
 | `*/examples` | Example Verilog, VHDL, `.hdltest` and `.vcd` files to try the apps with. |
 
 ## Try it

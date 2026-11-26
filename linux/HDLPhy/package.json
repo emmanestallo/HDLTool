@@ -1,0 +1,56 @@
+{
+  "name": "hdlphy",
+  "productName": "HDLPhy",
+  "version": "1.0.0",
+  "description": "Synthesis and place-and-route of Verilog designs on SKY130, with schematic and layout views",
+  "author": "Emman",
+  "license": "MIT",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --linux dir",
+    "package": "electron-builder --linux deb tar.gz"
+  },
+  "dependencies": {
+    "netlistsvg": "1.0.2"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "dev.opensourceicd.hdlphy",
+    "productName": "HDLPhy",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "schematic-worker.js",
+      "package.json",
+      "src/**",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "flow",
+        "to": "flow"
+      },
+      {
+        "from": "examples",
+        "to": "examples"
+      }
+    ],
+    "linux": {
+      "executableName": "hdlphy",
+      "icon": "build/icon.png",
+      "category": "Development",
+      "synopsis": "SKY130 synthesis and place-and-route with schematic and layout views",
+      "target": [
+        "dir"
+      ]
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "hdl-viewer",
+  "productName": "HDL Viewer",
+  "version": "1.0.0",
+  "description": "A VS Code-styled waveform viewer for VCD files",
+  "author": "Emman",
+  "license": "MIT",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --linux dir",
+    "package": "electron-builder --linux deb tar.gz"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "dev.opensourceicd.hdlviewer",
+    "productName": "HDL Viewer",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js", "package.json", "src/**", "build/icon.png"],
+    "extraResources": [{ "from": "examples", "to": "examples" }],
+    "fileAssociations": [{ "ext": "vcd", "name": "VCD waveform", "mimeType": "text/x-vcd" }],
+    "linux": {
+      "executableName": "hdl-viewer",
+      "icon": "build/icon.png",
+      "category": "Development",
+      "synopsis": "Waveform viewer for VCD files",
+      "mimeTypes": ["text/x-vcd"],
+      "target": ["dir"]
+    }
+  }
+}

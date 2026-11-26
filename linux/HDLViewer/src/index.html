@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
+  <title>HDL Viewer</title>
+  <link rel="stylesheet" href="vendor/codicon.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <div id="titlebar">
+      <div class="tb-left">
+        <span class="tb-logo codicon codicon-pulse"></span>
+        <button class="tb-btn codicon codicon-menu" id="menuBtn" title="Menu"></button>
+      </div>
+      <div id="title">HDL Viewer</div>
+      <div class="tb-right">
+        <button class="tb-btn codicon codicon-layout-sidebar-left" data-cmd="toggle-sidebar" title="Toggle Sidebar (Ctrl+B)"></button>
+        <button class="tb-btn codicon codicon-zoom-in" data-cmd="zoom-in" title="Zoom In (Ctrl+=)"></button>
+        <button class="tb-btn codicon codicon-zoom-out" data-cmd="zoom-out" title="Zoom Out (Ctrl+-)"></button>
+        <button class="tb-btn codicon codicon-screen-full" data-cmd="zoom-fit" title="Zoom to Fit (Ctrl+0)"></button>
+        <button class="tb-btn codicon codicon-refresh" data-cmd="reload" title="Reload (Ctrl+R)"></button>
+      </div>
+    </div>
+    <div id="main">
+      <div id="activitybar">
+        <button class="ab-item codicon codicon-files" data-mode="explorer" title="Explorer"></button>
+        <button class="ab-item codicon codicon-search" data-mode="search" title="Search Signals (Ctrl+Shift+F)"></button>
+        <div class="ab-spacer"></div>
+        <button class="ab-item codicon codicon-settings-gear" id="gearBtn" title="Settings"></button>
+      </div>
+      <div id="sidebar"></div>
+      <div id="sidebarSplitter" class="splitter"></div>
+      <div id="editor">
+        <div id="tabs"></div>
+        <div id="content"></div>
+      </div>
+    </div>
+    <div id="statusbar"></div>
+  </div>
+  <div id="dropOverlay"><div class="drop-frame"></div><div class="drop-label"><span class="codicon codicon-new-file"></span> Drop to open waveform</div></div>
+
+  <script src="format.js"></script>
+  <script src="themes.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

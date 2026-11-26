@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-eval' blob: data:; worker-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:">
+  <title>HDL Simulator</title>
+  <link rel="stylesheet" href="vendor/codicon.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="coder" class="tabroot"></div>
+  <div id="tester" class="tabroot" style="display:none"></div>
+
+  <script src="common/themes.js"></script>
+  <script src="common/ui.js"></script>
+  <script src="common/shell.js"></script>
+  <script src="coder/lexer.js"></script>
+  <script src="coder/structure.js"></script>
+  <script src="coder/symbols.js"></script>
+  <script src="coder/templates.js"></script>
+  <script src="coder/snippets.js"></script>
+  <script src="coder/workspace.js"></script>
+  <script src="coder/toolchain.js"></script>
+  <script src="coder/editor.js"></script>
+  <script src="coder/coder-model.js"></script>
+  <script src="coder/coder-hier.js"></script>
+  <script src="coder/coder-ui.js"></script>
+  <script src="tester/verilog.js"></script>
+  <script src="tester/library.js"></script>
+  <script src="tester/testmodel.js"></script>
+  <script src="tester/tbgen.js"></script>
+  <script src="tester/canvas-geo.js"></script>
+  <script src="tester/tester-model.js"></script>
+  <script src="tester/tester-ui.js"></script>
+  <script src="../node_modules/monaco-editor/min/vs/loader.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

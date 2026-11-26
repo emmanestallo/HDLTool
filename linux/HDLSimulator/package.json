@@ -1,0 +1,38 @@
+{
+  "name": "hdl-simulator",
+  "productName": "HDL Simulator",
+  "version": "1.0.0",
+  "description": "HDL Coder and HDL Tester in one window: a Verilog editor and a visual testbench builder",
+  "author": "Emman",
+  "license": "MIT",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --linux dir",
+    "package": "electron-builder --linux deb tar.gz"
+  },
+  "dependencies": {
+    "monaco-editor": "0.52.2"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "dev.opensourceicd.hdlsimulator",
+    "productName": "HDL Simulator",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js", "package.json", "src/**", "build/icon.png", "node_modules/monaco-editor/min/**", "node_modules/monaco-editor/package.json"],
+    "extraResources": [{ "from": "examples", "to": "examples" }],
+    "linux": {
+      "executableName": "hdl-simulator",
+      "icon": "build/icon.png",
+      "category": "Development",
+      "synopsis": "Verilog editor and visual testbench builder",
+      "mimeTypes": ["text/x-verilog", "text/x-systemverilog", "text/x-vhdl"],
+      "target": ["dir"]
+    },
+    "deb": { "depends": ["iverilog"] }
+  }
+}
