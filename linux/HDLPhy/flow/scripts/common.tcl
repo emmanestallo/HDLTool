@@ -36,7 +36,24 @@ proc load_stage {odb} {
   set_dont_use_cells
 }
 
+# Power and ground pins of every cell to VPWR/VGND. The rules (floorplan.tcl) are kept in the database,
+# so this also connects the cells added since: buffers from repair_design/repair_timing, clock buffers, fillers.
+proc connect_pg {} { global_connect }
+
+# Number of cell power/ground pins with no net (0 when connect_pg has run after the last cell was added)
+proc unconnected_pg_pins {} {
+  set n 0
+  foreach inst [[ord::get_db_block] getInsts] {
+    foreach it [$inst getITerms] {
+      set st [[$it getMTerm] getSigType]
+      if {($st eq "POWER" || $st eq "GROUND") && [$it getNet] eq "NULL"} { incr n }
+    }
+  }
+  return $n
+}
+
 proc save_stage {name} {
+  connect_pg
   write_db [result $name.odb]
   write_def [result $name.def]
 }

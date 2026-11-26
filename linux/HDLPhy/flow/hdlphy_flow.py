@@ -44,6 +44,11 @@ DEFAULTS = {
     'clock_port': 'clk', 'clock_period_ns': 10.0,
     'utilization': 40.0, 'aspect_ratio': 1.0, 'core_margin_um': 5.0, 'min_core_um': 30.0,
     'place_density': 0.6, 'flatten': True,
+    # die edge for the I/O pins: 'any' (the pin placer chooses), 'left', 'right', 'top' or 'bottom';
+    # the clock can also follow the inputs ('inputs')
+    'pin_input_side': 'any', 'pin_output_side': 'any', 'pin_clock_side': 'inputs',
+    # bus pins: 'free' (the pin placer orders them), 'ascending' or 'descending' (bits together, in index order)
+    'pin_bus_order': 'free',
     'pdk_root': os.environ.get('PDK_ROOT') or os.path.join(HOME, 'eda', 'pdks'),
     'pdk': 'sky130A', 'scl': 'sky130_fd_sc_hd', 'corner': 'tt_025C_1v80',
     'threads': max(1, min(8, os.cpu_count() or 1)),
@@ -315,8 +320,61 @@ def stage_synth(cfg, files, p, tools):
 
 # ---------------------------------------------------------------- OpenROAD stages
 
+EDGES = ('left', 'right', 'top', 'bottom')
+# Edge length per I/O pin: the pin placer keeps pins two routing tracks apart, on met3 (0.68 um pitch) on the
+# left/right edges and on met2 (0.46 um pitch) on the top/bottom edges; it also keeps ~1 um clear of each corner.
+PIN_STEP_UM = {'left': 1.36, 'right': 1.36, 'top': 0.92, 'bottom': 0.92}
+PIN_CORNER_UM = 1.0
+
+
+def pin_sides(cfg, has_clock):
+    """{'input': edge, 'output': edge, 'clock': edge}, each one of EDGES or 'any'."""
+    def edge(key, default):
+        v = str(cfg.get(key) or default).strip().lower()
+        return v if v in EDGES else 'any'
+    sides = {'input': edge('pin_input_side', 'any'), 'output': edge('pin_output_side', 'any')}
+    clk = str(cfg.get('pin_clock_side') or 'inputs').strip().lower()
+    sides['clock'] = sides['input'] if clk == 'inputs' else edge('pin_clock_side', 'any')
+    if not has_clock:
+        sides['clock'] = 'any'
+    return sides
+
+
+def bus_order(cfg):
+    v = str(cfg.get('pin_bus_order') or 'free').strip().lower()
+    return v if v in ('ascending', 'descending') else 'free'
+
+
+def io_pin_counts(cfg, p, has_clock):
+    """Pin (bit) counts of the top module's ports: input (without the clock), output, clock, other; and the
+    buses as (group, bits) with group input, output or other."""
+    n = {'input': 0, 'output': 0, 'clock': 0, 'other': 0}
+    buses = []
+    try:
+        top = json.load(open(os.path.join(p['results'], 'gate.json')))['modules'][cfg['top']]
+    except (OSError, ValueError, KeyError):
+        return n, buses
+    clk = (cfg.get('clock_port') or '').strip()
+    for name, port in top['ports'].items():
+        bits = len(port.get('bits', []))
+        if has_clock and name == clk:
+            n['clock'] += bits
+            continue
+        group = port.get('direction') if port.get('direction') in ('input', 'output') else 'other'
+        n[group] += bits
+        if bits > 1:
+            buses.append((group, bits))
+    return n, buses
+
+
+def edge_um(n, e):
+    """Die edge length for n pins on edge e, with 25 % headroom and the corners kept clear."""
+    return n * PIN_STEP_UM[e] * 1.25 + 2 * PIN_CORNER_UM + 2.0 if n else 0.0
+
+
 def floorplan_geometry(cfg, p):
-    """Die and core boxes (um) from the synthesized cell area and the target utilization."""
+    """Die and core boxes (um) from the synthesized cell area and the target utilization, grown where
+    needed so every die edge has room for the I/O pins assigned to it."""
     met = json.load(open(os.path.join(p['reports'], 'metrics.json'))).get('synth', {})
     area = float(met.get('cell_area_um2') or 100.0)
     util = max(5.0, min(90.0, float(cfg['utilization']))) / 100.0
@@ -325,25 +383,54 @@ def floorplan_geometry(cfg, p):
     w = math.sqrt(core_area / ar)
     h = w * ar
     min_core = float(cfg.get('min_core_um') or 30.0)
-    # room for the I/O pins: about 1.5 um of edge per pin over the four sides
-    n_io = 0
-    try:
-        mods = json.load(open(os.path.join(p['results'], 'gate.json')))['modules']
-        top = mods[cfg['top']]
-        n_io = sum(len(port['bits']) for port in top['ports'].values())
-    except (OSError, ValueError, KeyError):
-        pass
-    min_side = max(min_core, n_io * 1.5 / 4.0)
-    w, h = max(w, min_side), max(h, min_side)
+    m = float(cfg['core_margin_um'])
+    m = math.ceil(m / 0.46) * 0.46
+    has_clock = bool(met.get('has_clock'))
+    counts, buses = io_pin_counts(cfg, p, has_clock)
+    n_io = sum(counts.values())
+    sides = pin_sides(cfg, has_clock)
+    notes = []
+    if all(e == 'any' for e in sides.values()):
+        # pins anywhere: about 1.5 um of edge per pin over the four sides
+        min_side = max(min_core, n_io * 1.5 / 4.0)
+        w, h = max(w, min_side), max(h, min_side)
+    else:
+        # pins per edge: the assigned groups, plus a quarter of the unassigned pins on every edge
+        demand = {e: 0.0 for e in EDGES}
+        loose = counts['other']
+        for g in ('input', 'output', 'clock'):
+            if sides[g] in EDGES:
+                demand[sides[g]] += counts[g]
+            else:
+                loose += counts[g]
+        for e in EDGES:
+            demand[e] += loose / 4.0
+        need_h = max(edge_um(demand['left'], 'left'), edge_um(demand['right'], 'right')) - 2 * m   # core height
+        need_w = max(edge_um(demand['top'], 'top'), edge_um(demand['bottom'], 'bottom')) - 2 * m   # core width
+        w0, h0 = max(w, min_core), max(h, min_core)
+        w, h = max(w0, need_w), max(h0, need_h)
+        if h > h0 + 1e-6:
+            notes.append('core height raised to %.2f um (%s) for the left/right pins' % (math.ceil(h / 2.72) * 2.72, 'aspect ratio %.2g' % ar))
+        if w > w0 + 1e-6:
+            notes.append('core width raised to %.2f um (%s) for the top/bottom pins' % (math.ceil(w / 0.46) * 0.46, 'aspect ratio %.2g' % ar))
+    # an ordered bus with no edge of its own needs one edge long enough for all its bits
+    loose_bus = max([b for g, b in buses if sides.get(g, 'any') == 'any'] or [0]) if bus_order(cfg) != 'free' else 0
+    if loose_bus:
+        need_w, need_h = edge_um(loose_bus, 'top') - 2 * m, edge_um(loose_bus, 'left') - 2 * m
+        if w < need_w and h < need_h:
+            if (need_w - w) * h <= (need_h - h) * w:     # grow the side that costs less area
+                w = need_w
+                notes.append('core width raised to %.2f um for a %d-bit bus in bit order' % (math.ceil(w / 0.46) * 0.46, loose_bus))
+            else:
+                h = need_h
+                notes.append('core height raised to %.2f um for a %d-bit bus in bit order' % (math.ceil(h / 2.72) * 2.72, loose_bus))
     site_w, row_h = 0.46, 2.72
     w = math.ceil(w / site_w) * site_w
     h = math.ceil(h / row_h) * row_h
-    m = float(cfg['core_margin_um'])
-    m = math.ceil(m / 0.46) * 0.46
     core = (m, m, m + w, m + h)
     die_box = (0.0, 0.0, round(core[2] + m, 2), round(core[3] + m, 2))
     core = tuple(round(v, 2) for v in core)
-    return die_box, core, n_io
+    return die_box, core, n_io, sides, notes
 
 
 def pdn_params(core):
@@ -367,6 +454,7 @@ def openroad_env(cfg, files, p, lib):
         'TRACKS_INFO': files['tracks'], 'SCL': cfg['scl'],
         'DONT_USE_CELLS': ' '.join(read_patterns(files['synth_excluded'])),
         'PLACE_DENSITY': str(cfg['place_density']),
+        'CLOCK_PORT': (cfg.get('clock_port') or '').strip() if cfg.get('has_clock') else '',
         'HDLPHY_SCRIPTS': SCRIPTS,
     })
     return env
@@ -397,6 +485,13 @@ def stage_openroad(stage, cfg, files, p, tools, extra_env=None):
             m[key] = float(val)
         except ValueError:
             m[key] = val.strip()
+    if stage == 'place':
+        # PPL-0042: a pin group (ordered bus) found no place in its region and went to the placer's first-fit
+        # fallback (PPL-0078 only means one section of an edge was full, and the next one is tried)
+        bad = re.findall(r'^\[WARNING PPL-0*42\].*$', out, re.M)
+        m['pin_group_warnings'] = len(bad)
+        for line in bad[:5]:
+            emit('log', stage=stage, text='pin placement: ' + line)
     if stage == 'route':
         # TritonRoute's summary after its last iteration
         v = re.findall(r'Number of violations = (\d+)', out)
@@ -413,11 +508,25 @@ def stage_openroad(stage, cfg, files, p, tools, extra_env=None):
 
 
 def stage_floorplan(cfg, files, p, tools):
-    die_box, core, n_io = floorplan_geometry(cfg, p)
+    die_box, core, n_io, sides, notes = floorplan_geometry(cfg, p)
     extra = {'DIE_AREA': ' '.join('%.2f' % v for v in die_box), 'CORE_AREA': ' '.join('%.2f' % v for v in core)}
     extra.update(pdn_params(core))
     emit('log', stage='floorplan', text='die %s um, core %s um, %d I/O pins' % (extra['DIE_AREA'], extra['CORE_AREA'], n_io))
+    if any(e != 'any' for e in sides.values()):
+        emit('log', stage='floorplan', text='pin edges: inputs %(input)s, outputs %(output)s, clock %(clock)s' % sides)
+    if bus_order(cfg) != 'free':
+        emit('log', stage='floorplan', text='bus pins in %s bit order' % bus_order(cfg))
+    for note in notes:
+        emit('log', stage='floorplan', text=note)
     return stage_openroad('floorplan', cfg, files, p, tools, extra)
+
+
+def stage_place(cfg, files, p, tools):
+    met = json.load(open(os.path.join(p['reports'], 'metrics.json'))).get('synth', {})
+    sides = pin_sides(cfg, bool(met.get('has_clock')))
+    return stage_openroad('place', cfg, files, p, tools,
+                          {'PIN_INPUT_SIDE': sides['input'], 'PIN_OUTPUT_SIDE': sides['output'],
+                           'PIN_CLOCK_SIDE': sides['clock'], 'PIN_BUS_ORDER': bus_order(cfg)})
 
 
 def stage_cts(cfg, files, p, tools):
@@ -518,7 +627,7 @@ def run(cfg, start, stop):
     files = pdk_files(cfg)
     tools = {t: find_tool(t, cfg) for t in ('yosys', 'openroad', 'klayout')}
     funcs = {'synth': stage_synth, 'floorplan': stage_floorplan,
-             'place': lambda c, f, pp, t: stage_openroad('place', c, f, pp, t),
+             'place': stage_place,
              'cts': stage_cts, 'route': lambda c, f, pp, t: stage_openroad('route', c, f, pp, t),
              'gds': stage_gds}
     i0, i1 = STAGES.index(start), STAGES.index(stop)

@@ -13,6 +13,15 @@ detailed_route -output_drc [report_file drc.rpt] -verbose 1
 filler_placement [list $::env(SCL)__decap_* $::env(SCL)__fill_*]
 check_placement
 
+# power grid: every cell's VPWR/VGND/VPB/VNB pin on its net, and every VPWR/VGND shape connected to the pins
+connect_pg
+metric pg_unconnected_pins [unconnected_pg_pins]
+foreach net {VPWR VGND} {
+  set ok 0
+  catch { set ok [check_power_grid -net $net -error_file [report_file pdn_$net.rpt]] }
+  metric pdn_[string tolower $net]_connected [expr {$ok ? 1 : 0}]
+}
+
 # reports
 set_propagated_clock [all_clocks]
 report_checks -path_delay max -fields {slew cap input nets fanout} -format full_clock_expanded > [report_file timing_setup.rpt]

@@ -46,16 +46,16 @@ sudo chown root:root ~/.local/opt/<app>/chrome-sandbox && sudo chmod 4755 ~/.loc
 
 Open a folder of Verilog files: **Open Folder**, drag it onto the window, or run `hdl-phy <folder>`. Then:
 
-1. In the Design view, tick the source files, pick the top module and the clock port and period. Adjust the floorplan if needed: utilization, aspect ratio, core margin and placement density.
+1. In the Design view, tick the source files, pick the top module and the clock port and period. Adjust the floorplan if needed: utilization, aspect ratio, core margin and placement density. Under **Pins**, choose the die edge for the inputs, the outputs and the clock (left, right, top, bottom, or any edge). Left/right pins are on met3, top/bottom pins on met2, and the die grows if an edge is too short for its pins. **Bus order** keeps the bits of each bus together and in index order along the edge: bit 0 at the bottom (left/right edges) or on the left (top/bottom edges), or the reverse.
 2. Press **Run Flow**, or F5. The Flow view shows the stages, and the Output panel streams the tool output:
 
    | Stage | Tool | Result |
    |---|---|---|
    | Synthesis | yosys | RTL view (`rtl.json`), gate-level netlist (`netlist.v`, `gate.json`), area report |
    | Floorplan | OpenROAD | die and core sized from the cell area, rows, tracks, tap/end-cap cells, power grid (met1 rails, met4/met5 stripes) |
-   | Placement | OpenROAD | global placement, I/O pins (met2/met3), electrical repair, detailed placement |
+   | Placement | OpenROAD | global placement, I/O pins (met2/met3, on the chosen edges), electrical repair, detailed placement |
    | Clock Tree | OpenROAD | CTS with `clkbuf_4/8/16`, setup/hold repair (skipped without a clock) |
-   | Routing | OpenROAD | global and detailed routing on met1–met5, decap/fill cells, timing/power/area reports |
+   | Routing | OpenROAD | global and detailed routing on met1–met5, decap/fill cells, power-grid check, timing/power/area reports |
    | GDS | KLayout | `final.gds` (DEF + cell GDS) and the geometry the Layout tab draws |
 
 3. Switch between the two title-bar tabs (Ctrl+1 / Ctrl+2):
@@ -85,6 +85,10 @@ PDK settings come from the PDK's LibreLane configuration for `sky130_fd_sc_hd`:
 - tap distance, end caps, CTS buffers.
 
 The power-stripe pitch is scaled to the die, because LibreLane's 153 µm pitch is larger than small designs.
+
+The power grid is a block (macro) grid: met1 rails along the rows, met4 vertical and met5 horizontal stripes, and VPWR/VGND pins on the met4/met5 stripes. There is no core ring and there are no power pins on the die edge. Every stage connects the VPWR/VGND/VPB/VNB pins of the cells it adds, so `final_pg.v` is complete. The routing stage checks the grid (`check_power_grid`) and counts unconnected power pins. The Reports view shows the result as **Power grid**.
+
+In `hdlphy.json` the pin edges are `pin_input_side`, `pin_output_side` and `pin_clock_side`. Each one is `any`, `left`, `right`, `top` or `bottom`; the clock can also be `inputs`, to follow the inputs. Inout pins are always placed automatically. `pin_bus_order` is `free` (the pin placer orders the bits for the shortest wires), `ascending` (bit index rising up the left/right edges and rightwards along the top/bottom edges) or `descending`.
 
 ## Layout of this folder
 

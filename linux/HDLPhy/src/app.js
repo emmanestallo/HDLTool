@@ -12,6 +12,8 @@ const STAGES = [
   { id: 'route', title: 'Routing', tool: 'OpenROAD', icon: 'type-hierarchy-sub', desc: 'Global and detailed routing, fill' },
   { id: 'gds', title: 'GDS', tool: 'KLayout', icon: 'file-binary', desc: 'Stream out with the cell layouts' },
 ];
+const BUS_ORDERS = [['free', 'Free (shortest wires)'], ['ascending', 'In order, bit 0 at bottom / left'], ['descending', 'In order, bit 0 at top / right']];
+const PIN_SIDES = [['any', 'Any edge (automatic)'], ['left', 'Left'], ['right', 'Right'], ['top', 'Top'], ['bottom', 'Bottom']];
 const CORNERS = [['tt_025C_1v80', 'Typical (tt, 25 °C, 1.80 V)'], ['ss_100C_1v60', 'Slow (ss, 100 °C, 1.60 V)'], ['ff_n40C_1v95', 'Fast (ff, −40 °C, 1.95 V)']];
 
 const App = {
@@ -190,7 +192,8 @@ const App = {
     const saved = this.readProjectFile(dir);
     const all = Host.fs.hdlFiles(dir);
     const cfg = Object.assign({ sources: null, top: null, clock_port: null, clock_period_ns: 10, utilization: 40, aspect_ratio: 1,
-      core_margin_um: 5, place_density: 0.6, corner: 'tt_025C_1v80', defines: {}, include_dirs: [] }, saved || {});
+      core_margin_um: 5, place_density: 0.6, pin_input_side: 'any', pin_output_side: 'any', pin_clock_side: 'inputs',
+      pin_bus_order: 'free', corner: 'tt_025C_1v80', defines: {}, include_dirs: [] }, saved || {});
     // sources are stored relative to the project folder
     // explicitly opened files win, then the saved list, then every non-testbench file in the folder
     let sources = files || (cfg.sources ? cfg.sources.map((s) => PathUtil.resolve(dir, s)) : all.filter((f) => !/(^|[/_])tb_|_tb\.s?v$|testbench/i.test(PathUtil.basename(f))));
@@ -322,7 +325,8 @@ const App = {
       design: c.top, top: c.top, sources: c.sources, include_dirs: (c.include_dirs || []).map((d) => PathUtil.resolve(this.project.dir, d)),
       defines: c.defines || {}, clock_port: c.clock_port || '', clock_period_ns: Number(c.clock_period_ns) || 10,
       utilization: Number(c.utilization) || 40, aspect_ratio: Number(c.aspect_ratio) || 1, core_margin_um: Number(c.core_margin_um) || 5,
-      place_density: Number(c.place_density) || 0.6, corner: c.corner || 'tt_025C_1v80', threads: Prefs.get('threads'), run_dir: run,
+      place_density: Number(c.place_density) || 0.6, pin_input_side: c.pin_input_side || 'any', pin_output_side: c.pin_output_side || 'any',
+      pin_clock_side: c.pin_clock_side || 'inputs', pin_bus_order: c.pin_bus_order || 'free', corner: c.corner || 'tt_025C_1v80', threads: Prefs.get('threads'), run_dir: run,
     };
     const p = PathUtil.join(run, 'config.json');
     const err = Host.fs.writeText(p, JSON.stringify(cfg, null, 1) + '\n');
@@ -541,6 +545,20 @@ const App = {
         field('Aspect ratio', num('aspect_ratio', 0.1, 0.2, 5, 'H / W')),
         field('Core margin', num('core_margin_um', 1, 2, 100, 'µm'), 'Space between the core and the die edge'),
         field('Placement density', num('place_density', 0.05, 0.2, 1, ''), 'Target density for global placement')));
+    // I/O pin edges (applied by the floorplan, which sizes the die for them, and the placement)
+    const sideSel = (k, extra) => h('select', { class: 'vs-select full', onchange: (e) => this.setCfg(k, e.target.value) },
+      [...(extra || []), ...PIN_SIDES].map(([v, l]) => h('option', { value: v, selected: v === (c[k] || (extra ? extra[0][0] : 'any')) }, l)));
+    const sideHint = (v) => (v === 'left' || v === 'right' ? 'met3 pins' : v === 'top' || v === 'bottom' ? 'met2 pins' : null);
+    const clkSide = c.pin_clock_side === 'inputs' || !c.pin_clock_side ? c.pin_input_side : c.pin_clock_side;
+    scroll.append(this.section('PINS'),
+      h('div', { class: 'form' },
+        field('Inputs', sideSel('pin_input_side'), sideHint(c.pin_input_side)),
+        field('Outputs', sideSel('pin_output_side'), sideHint(c.pin_output_side)),
+        c.clock_port ? field('Clock', sideSel('pin_clock_side', [['inputs', 'With the inputs']]), sideHint(clkSide)) : null,
+        field('Bus order', h('select', { class: 'vs-select full', onchange: (e) => this.setCfg('pin_bus_order', e.target.value) },
+          BUS_ORDERS.map(([v, l]) => h('option', { value: v, selected: v === (c.pin_bus_order || 'free') }, l))),
+          c.pin_bus_order && c.pin_bus_order !== 'free' ? 'Each bus kept together, in bit-index order along its edge' : null),
+        h('div', { class: 'set-hint' }, 'The die grows if an edge is too short for its pins. Takes effect from Floorplan.')));
     scroll.append(this.section('TECHNOLOGY'),
       h('div', { class: 'form' },
         field('PDK', h('div', { class: 'mono small' }, 'sky130A · sky130_fd_sc_hd')),
@@ -622,6 +640,10 @@ const App = {
         row('Worst hold slack', `${Fmt.num(final[prefix + '_whs'], 3)} ns`, slackCls(final[prefix + '_whs'])),
         row('Total negative slack', `${Fmt.num(final[prefix + '_tns'], 3)} ns`, slackCls(final[prefix + '_tns'])));
       if (m.route) scroll.append(row('Wire length', `${Fmt.num(r.wirelength_um, 0)} µm`), row('DRC violations', Fmt.num(r.drc_violations, 0), Number(r.drc_violations) > 0 ? 'bad' : 'good'), row('Power (est.)', Fmt.power(r.power_total_w)));
+      if (m.route && r.pdn_vpwr_connected != null) {
+        const pgOk = Number(r.pdn_vpwr_connected) === 1 && Number(r.pdn_vgnd_connected) === 1 && Number(r.pg_unconnected_pins) === 0;
+        scroll.append(row('Power grid', pgOk ? 'VPWR, VGND connected' : `${Fmt.num(r.pg_unconnected_pins, 0)} open cell pins${Number(r.pdn_vpwr_connected) === 1 && Number(r.pdn_vgnd_connected) === 1 ? '' : ', grid not connected'}`, pgOk ? 'good' : 'bad'));
+      }
     }
     const rep = this.runDir() && PathUtil.join(this.runDir(), 'reports');
     if (rep) {
