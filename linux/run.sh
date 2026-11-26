@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — start an HDLTool app from source (no build):  ./run.sh hdl-simulator|hdl-viewer|hdlphy [files or folders]
+# run.sh — start an HDLTool app from source (no build):  ./run.sh hdl-simulator|hdl-viewer|hdl-phy [files or folders]
 # Installs the npm dependencies (and downloads Electron) on first use.
 set -euo pipefail
 HERE=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd -P)
@@ -7,8 +7,8 @@ HERE=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd -P)
 case "${1:-}" in
     hdl-simulator|simulator) dir=HDLSimulator ;;
     hdl-viewer|viewer) dir=HDLViewer ;;
-    hdlphy|phy) dir=HDLPhy ;;
-    *) echo "usage: $0 hdl-simulator|hdl-viewer|hdlphy [files or folders]" >&2; exit 2 ;;
+    hdl-phy|hdlphy|phy) dir=HDLPhy ;;
+    *) echo "usage: $0 hdl-simulator|hdl-viewer|hdl-phy [files or folders]" >&2; exit 2 ;;
 esac
 shift
 args=()

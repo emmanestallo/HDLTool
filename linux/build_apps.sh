@@ -6,26 +6,26 @@
 #   ./build_apps.sh --install            # build, then install for this user (no root needed):
 #                                        #   ~/.local/opt/<app>, ~/.local/bin/<app>, menu entry, icon
 #   ./build_apps.sh --package            # also make .deb and .tar.gz packages in <app>/dist
-#   ./build_apps.sh --install hdlphy     # only some apps: hdl-simulator, hdl-viewer, hdlphy
+#   ./build_apps.sh --install hdl-phy     # only some apps: hdl-simulator, hdl-viewer, hdl-phy
 #   ./build_apps.sh --uninstall          # remove what --install put in ~/.local
 #
 # Needs Node.js (npm). It is taken from ~/eda/tools/node/bin when present, else from PATH
 # (Ubuntu: sudo apt install nodejs npm). The Electron binary is downloaded by npm on first use.
 #
-# Run from source without building:   ./run.sh hdlphy [args]
+# Run from source without building:   ./run.sh hdl-phy [args]
 # ------------------------------------------------------------------
 set -euo pipefail
 HERE=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd -P)
 [ -x "$HOME/eda/tools/node/bin/node" ] && export PATH="$HOME/eda/tools/node/bin:$PATH"
 
-declare -A DIRS=([hdl-simulator]=HDLSimulator [hdl-viewer]=HDLViewer [hdlphy]=HDLPhy)
-declare -A NAMES=([hdl-simulator]="HDL Simulator" [hdl-viewer]="HDL Viewer" [hdlphy]="HDLPhy")
+declare -A DIRS=([hdl-simulator]=HDLSimulator [hdl-viewer]=HDLViewer [hdl-phy]=HDLPhy)
+declare -A NAMES=([hdl-simulator]="HDL Simulator" [hdl-viewer]="HDL Viewer" [hdl-phy]="HDLPhy")
 declare -A COMMENTS=(
     [hdl-simulator]="Verilog editor and visual testbench builder"
     [hdl-viewer]="Waveform viewer for VCD files"
-    [hdlphy]="SKY130 synthesis and place-and-route with schematic and layout views")
-declare -A MIMES=([hdl-simulator]="text/x-verilog;text/x-systemverilog;text/x-vhdl;" [hdl-viewer]="text/x-vcd;" [hdlphy]="")
-ORDER=(hdl-simulator hdl-viewer hdlphy)
+    [hdl-phy]="SKY130 synthesis and place-and-route with schematic and layout views")
+declare -A MIMES=([hdl-simulator]="text/x-verilog;text/x-systemverilog;text/x-vhdl;" [hdl-viewer]="text/x-vcd;" [hdl-phy]="")
+ORDER=(hdl-simulator hdl-viewer hdl-phy)
 
 install=0 package=0 uninstall=0 apps=()
 for a in "$@"; do
@@ -34,7 +34,7 @@ for a in "$@"; do
         --package) package=1 ;;
         --uninstall) uninstall=1 ;;
         -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
-        *) [ -n "${DIRS[$a]:-}" ] || { echo "unknown app '$a' (hdl-simulator, hdl-viewer, hdlphy)" >&2; exit 2; }; apps+=("$a") ;;
+        *) [ -n "${DIRS[$a]:-}" ] || { echo "unknown app '$a' (hdl-simulator, hdl-viewer, hdl-phy)" >&2; exit 2; }; apps+=("$a") ;;
     esac
 done
 [ ${#apps[@]} -gt 0 ] || apps=("${ORDER[@]}")

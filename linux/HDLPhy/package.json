@@ -44,7 +44,7 @@
       }
     ],
     "linux": {
-      "executableName": "hdlphy",
+      "executableName": "hdl-phy",
       "icon": "build/icon.png",
       "category": "Development",
       "synopsis": "SKY130 synthesis and place-and-route with schematic and layout views",

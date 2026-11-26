@@ -155,7 +155,7 @@ const App = {
           { label: 'Open Simulation Output Folder', action: () => { const p = d && d.path ? PathUtil.join(PathUtil.dirname(d.path), 'sim_out') : null; if (p && Host.fs.exists(p)) Host.openPath(p); } },
           ...(IS_LINUX ? [{ type: 'separator' },
             { label: 'Synthesize and Place & Route in HDLPhy (SKY130)', enabled: !!(C.workspace.root || (d && d.path)) && !!Host.hdlphyPath(),
-              action: () => Host.openInHDLPhy([C.workspace.root || d.path]).then((ok) => { if (!ok) showToast('HDLPhy is not installed (HDLTool/linux/build_apps.sh --install hdlphy)'); }) }] : []),
+              action: () => Host.openInHDLPhy([C.workspace.root || d.path]).then((ok) => { if (!ok) showToast('HDLPhy is not installed (HDLTool/linux/build_apps.sh --install hdl-phy)'); }) }] : []),
           { type: 'separator' },
           { label: 'Language Mode', submenu: HDLLanguage.all.map((l) => ({ label: HDLLanguage.displayName(l), type: 'radio', checked: !!d && d.language === l, action: () => { if (d) { d.setLanguage(l); C.scheduleLint(d, 0); C.render('all'); } } })) }] },
         help,

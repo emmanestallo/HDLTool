@@ -6,7 +6,7 @@ Three Electron apps with the same VS Code look as the macOS and Windows versions
 |---|---|---|
 | **HDL Simulator** | `hdl-simulator` | Verilog/SystemVerilog/VHDL editor (**Coder**) and visual testbench builder (**Tester**); simulates with Icarus Verilog. |
 | **HDL Viewer** | `hdl-viewer` | VCD waveform viewer (digital and analog display). |
-| **HDLPhy** | `hdlphy` | Synthesis and place-and-route of a Verilog design on **SKY130** (`sky130_fd_sc_hd`), with a **Schematic** tab (after synthesis) and a **Layout** tab (after place and route). |
+| **HDLPhy** | `hdl-phy` | Synthesis and place-and-route of a Verilog design on **SKY130** (`sky130_fd_sc_hd`), with a **Schematic** tab (after synthesis) and a **Layout** tab (after place and route). |
 
 HDL Simulator and HDL Viewer are the Windows apps' sources (Electron 44.7.0), adapted for Linux: Ctrl shortcuts, Linux tool locations, *Show in File Manager*, and HDL Viewer discovery (`hdl-viewer` on PATH, `~/.local/opt`, `/opt`, or `../HDLViewer` when running from source).
 
@@ -23,7 +23,7 @@ HDL Simulator and HDL Viewer are the Windows apps' sources (Electron 44.7.0), ad
 
 ```bash
 cd HDLTool/linux
-./build_apps.sh --install          # all three apps; or e.g. ./build_apps.sh --install hdlphy
+./build_apps.sh --install          # all three apps; or e.g. ./build_apps.sh --install hdl-phy
 ```
 
 This builds each app with electron-builder (`<app>/dist/linux-unpacked`) and installs it for the current user:
@@ -34,7 +34,7 @@ This builds each app with electron-builder (`<app>/dist/linux-unpacked`) and ins
 
 `--package` also writes `.deb` and `.tar.gz` packages to `<app>/dist`. `--uninstall` removes the installed files.
 
-To run from source without building, use `./run.sh hdl-simulator`, `./run.sh hdl-viewer file.vcd` or `./run.sh hdlphy path/to/design`.
+To run from source without building, use `./run.sh hdl-simulator`, `./run.sh hdl-viewer file.vcd` or `./run.sh hdl-phy path/to/design`.
 
 **Sandbox.** Ubuntu 24.04 and later restrict the user-namespace sandbox. Chromium's fallback, `chrome-sandbox`, must be owned by root with mode 4755. Until that is set up, the launchers start the apps with `--no-sandbox`. The apps only load their own local pages. To keep the sandbox on:
 
@@ -44,7 +44,7 @@ sudo chown root:root ~/.local/opt/<app>/chrome-sandbox && sudo chmod 4755 ~/.loc
 
 ## HDLPhy
 
-Open a folder of Verilog files: **Open Folder**, drag it onto the window, or run `hdlphy <folder>`. Then:
+Open a folder of Verilog files: **Open Folder**, drag it onto the window, or run `hdl-phy <folder>`. Then:
 
 1. In the Design view, tick the source files, pick the top module and the clock port and period. Adjust the floorplan if needed: utilization, aspect ratio, core margin and placement density.
 2. Press **Run Flow**, or F5. The Flow view shows the stages, and the Output panel streams the tool output:

@@ -282,9 +282,9 @@ function hdlphyCommand() {
   const home = app.getPath('home');
   const env = process.env.HDLPHY;
   if (env && exists(env)) return { exe: env, args: [] };
-  const launcher = onPath('hdlphy') || [path.join(home, '.local', 'bin', 'hdlphy')].find(exists);
+  const launcher = onPath('hdl-phy') || [path.join(home, '.local', 'bin', 'hdl-phy')].find(exists);
   if (launcher) return { exe: launcher, args: [] };
-  for (const p of ['/opt/HDLPhy/hdlphy', path.join(home, '.local', 'opt', 'hdlphy', 'hdlphy')]) {
+  for (const p of ['/opt/HDLPhy/hdl-phy', path.join(home, '.local', 'opt', 'hdl-phy', 'hdl-phy')]) {
     if (exists(p)) return { exe: p, args: ['--no-sandbox'] };
   }
   if (!app.isPackaged) {
