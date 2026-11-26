@@ -11,7 +11,19 @@ const STAGES = [
   { id: 'cts', title: 'Clock Tree', tool: 'OpenROAD', icon: 'git-merge', desc: 'Clock buffering, timing repair' },
   { id: 'route', title: 'Routing', tool: 'OpenROAD', icon: 'type-hierarchy-sub', desc: 'Global and detailed routing, fill' },
   { id: 'gds', title: 'GDS', tool: 'KLayout', icon: 'file-binary', desc: 'Stream out with the cell layouts' },
+  { id: 'drc', title: 'DRC', tool: 'KLayout + Magic', icon: 'checklist', desc: 'Full SKY130 design rule check of the GDS' },
+  { id: 'lvs', title: 'LVS', tool: 'Magic + netgen', icon: 'git-compare', desc: 'Layout vs. the power-aware netlist' },
 ];
+const LAST_STAGE = STAGES[STAGES.length - 1].id;
+// What a finished DRC or LVS stage found (null when clean), from its metrics
+function signoffIssue(id, m) {
+  if (id === 'drc' && m.drc && Number(m.drc.drc_clean) !== 1) return `${Fmt.num(m.drc.drc_klayout, 0)} KLayout and ${Fmt.num(m.drc.drc_magic, 0)} Magic DRC violations`;
+  if (id === 'lvs' && m.lvs && Number(m.lvs.lvs_match) !== 1) {
+    const split = (m.lvs.lvs_split_pins || []).length ? `, ${m.lvs.lvs_split_pins.join(', ')} labelled on unconnected pieces` : '';
+    return `LVS mismatch: ${m.lvs.lvs_bad_nets} bad nets, ${m.lvs.lvs_bad_devices} bad devices, ${m.lvs.lvs_pin_mismatches} unmatched pins${split}`;
+  }
+  return null;
+}
 const BUS_ORDERS = [['free', 'Free (shortest wires)'], ['ascending', 'In order, bit 0 at bottom / left'], ['descending', 'In order, bit 0 at top / right']];
 const PIN_SIDES = [['any', 'Any edge (automatic)'], ['left', 'Left'], ['right', 'Right'], ['top', 'Top'], ['bottom', 'Bottom']];
 const CORNERS = [['tt_025C_1v80', 'Typical (tt, 25 °C, 1.80 V)'], ['ss_100C_1v60', 'Slow (ss, 100 °C, 1.60 V)'], ['ff_n40C_1v95', 'Fast (ff, −40 °C, 1.95 V)']];
@@ -76,7 +88,7 @@ const App = {
       schematic: h('button', { class: 'app-tab', onclick: () => this.showTab('schematic'), title: 'Schematic after synthesis' }, icon('circuit-board'), 'Schematic'),
       layout: h('button', { class: 'app-tab', onclick: () => this.showTab('layout'), title: 'Layout after place and route' }, icon('layers'), 'Layout'),
     };
-    this.runBtn = h('button', { class: 'run-button', onclick: () => (this.running ? this.stop() : this.run('synth', 'gds')) });
+    this.runBtn = h('button', { class: 'run-button', onclick: () => (this.running ? this.stop() : this.run('synth', LAST_STAGE)) });
     this.titleEl = h('span', null, 'HDLPhy');
     const titlebar = h('div', { class: 'titlebar' },
       h('span', { class: 'codicon codicon-chip app-logo' }),
@@ -85,6 +97,7 @@ const App = {
       h('div', { class: 'command-center', onclick: () => this.openFolderDialog(), title: 'Open a folder of Verilog files' }, icon('folder-opened'), this.titleEl),
       h('div', { class: 'tb-spacer' }),
       this.runBtn,
+      h('button', { class: 'tb-btn', title: 'Run DRC + LVS on the GDS (F6)', onclick: () => this.runSignoff() }, icon('checklist')),
       h('button', { class: 'tb-btn', title: 'Run one stage…', onclick: (e) => this.stageMenu(e) }, icon('debug-step-over')),
       h('div', { class: 'tb-sep' }),
       h('button', { class: 'tb-btn', title: 'Toggle side bar', onclick: () => { this.sidebarEl.classList.toggle('hidden'); this.sideSplit.classList.toggle('hidden'); } }, icon('layout-sidebar-left')),
@@ -311,9 +324,11 @@ const App = {
     if (!run) return;
     const m = Host.fs.readText(PathUtil.join(run, 'reports', 'metrics.json'));
     if (m) { try { this.metrics = JSON.parse(m); } catch { /* ignore */ } }
-    const results = PathUtil.join(run, 'results');
-    const marks = { synth: 'gate.json', floorplan: '2_floorplan.odb', place: '3_place.odb', cts: '4_cts.odb', route: '5_route.odb', gds: 'final.gds' };
-    for (const s of STAGES) if (Host.fs.exists(PathUtil.join(results, marks[s.id]))) this.stageState[s.id] = { status: 'done', seconds: null, old: true };
+    const marks = { synth: 'results/gate.json', floorplan: 'results/2_floorplan.odb', place: 'results/3_place.odb', cts: 'results/4_cts.odb',
+      route: 'results/5_route.odb', gds: 'results/final.gds', drc: 'reports/signoff_drc.rpt', lvs: 'reports/lvs.rpt' };
+    for (const s of STAGES) {
+      if (Host.fs.exists(PathUtil.join(run, ...marks[s.id].split('/')))) this.stageState[s.id] = { status: 'done', seconds: null, old: true, warn: signoffIssue(s.id, this.metrics) };
+    }
   },
 
   // ---------------------------------------------------------------- running the flow
@@ -342,7 +357,7 @@ const App = {
     const missing = this.missingTools(from, to);
     if (missing.length) {
       modal('Tools not found', h('div', { class: 'vstack small' }, ...missing.map((m) => h('div', null, h('b', null, m.name), ' — ', m.hint))), [{ label: 'OK', primary: true }],
-        'HDLPhy runs yosys, OpenROAD and KLayout. These were not found:');
+        'HDLPhy runs yosys, OpenROAD, KLayout, Magic and netgen. These were not found:');
       return;
     }
     const cfgPath = this.writeRunConfig();
@@ -368,13 +383,27 @@ const App = {
 
   stop() { Host.flow.stop(); },
 
+  // DRC and LVS check the GDS of the last run, so they need final.gds (and the routed final_pg.v)
+  signoffReady() {
+    const run = this.runDir();
+    return !!(run && Host.fs.exists(PathUtil.join(run, 'results', 'final.gds')) && Host.fs.exists(PathUtil.join(run, 'results', 'final_pg.v')));
+  },
+
+  runSignoff() {
+    if (this.running) return;
+    if (!this.signoffReady()) { showToast('DRC and LVS check the GDS: run the full flow first'); return; }
+    this.run('drc', 'lvs');
+  },
+
   missingTools(from, to) {
     if (!this.tools || !this.tools.tools) return [];
     const i0 = STAGES.findIndex((s) => s.id === from), i1 = STAGES.findIndex((s) => s.id === to);
     const need = new Set();
-    for (let i = i0; i <= i1; i++) need.add(i === 0 ? 'yosys' : i === 5 ? 'klayout' : 'openroad');
+    const uses = { synth: ['yosys'], gds: ['klayout'], drc: ['klayout', 'magic'], lvs: ['magic', 'netgen'] };
+    for (let i = i0; i <= i1; i++) for (const t of uses[STAGES[i].id] || ['openroad']) need.add(t);
     const hints = { yosys: 'build it with setup/install-eda-tools.sh build (into ~/eda/tools/yosys) or install the OSS CAD Suite',
-      openroad: 'build it with setup/install-eda-tools.sh build (into ~/eda/tools/openroad)', klayout: 'sudo apt install klayout' };
+      openroad: 'build it with setup/install-eda-tools.sh build (into ~/eda/tools/openroad)', klayout: 'sudo apt install klayout',
+      magic: 'build it with setup/install-eda-tools.sh build (into ~/eda/tools/magic)', netgen: 'build it with setup/install-eda-tools.sh build (into ~/eda/tools/netgen)' };
     return [...need].filter((t) => !this.tools.tools[t]).map((t) => ({ name: t, hint: hints[t] }));
   },
 
@@ -398,7 +427,7 @@ const App = {
         let ev;
         try { ev = JSON.parse(line.slice(9)); } catch { continue; }
         this.onFlowEvent(ev);
-        if (ev.event === 'stage' || ev.event === 'error' || (ev.event === 'log' && ev.text)) add.push({ kind: 'event', text: this.describeEvent(ev), ev });
+        if (ev.event === 'stage' || ev.event === 'error' || (ev.event === 'log' && ev.text)) add.push({ kind: ev.warn || (ev.event === 'log' && /^sign-off:/.test(ev.text)) ? 'error' : 'event', text: this.describeEvent(ev), ev });
       } else add.push({ kind: /\b(ERROR|Error|error:)/.test(line) ? 'error' : /\b(WARNING|Warning)\b/.test(line) ? 'warning' : 'text', text: line });
     }
     this.output.push(...add);
@@ -411,6 +440,7 @@ const App = {
       const s = STAGES.find((x) => x.id === ev.stage);
       const name = s ? s.title : ev.stage;
       if (ev.status === 'start') return `▶ ${name}`;
+      if (ev.status === 'done' && ev.warn) return `⚠ ${name} finished in ${Fmt.secs(ev.seconds)} and found errors: ${ev.warn}`;
       return ev.status === 'done' ? `✔ ${name} finished in ${Fmt.secs(ev.seconds)}` : `✖ ${name} failed after ${Fmt.secs(ev.seconds)}`;
     }
     if (ev.event === 'error') return '✖ ' + ev.message;
@@ -419,7 +449,8 @@ const App = {
 
   onFlowEvent(ev) {
     if (ev.event === 'stage') {
-      this.stageState[ev.stage] = { status: ev.status === 'start' ? 'running' : ev.status, seconds: ev.seconds, started: ev.status === 'start' ? Date.now() : null };
+      this.stageState[ev.stage] = { status: ev.status === 'start' ? 'running' : ev.status, seconds: ev.seconds, started: ev.status === 'start' ? Date.now() : null, warn: ev.warn || null };
+      if (ev.status === 'start' && ev.stage === STAGES[0].id) this.runIssues = [];
       if (ev.status === 'done' && ev.stage === 'synth') { this.schematic.loadedKey = null; if (this.tab === 'schematic') this.schematic.load(null); }
       if (ev.status === 'done' && ev.stage === 'gds') { this.layout.loadedKey = null; this.layout.stageId = 'route'; if (this.tab === 'layout') this.layout.load(); }
       if (ev.status === 'done' && ev.stage === 'cts') {
@@ -433,6 +464,8 @@ const App = {
       if (this.sidebarView !== 'design') this.renderSidebar();
     } else if (ev.event === 'error') {
       showToast(ev.message, 5000);
+    } else if (ev.event === 'finished') {
+      this.runIssues = ev.issues || [];
     }
   },
 
@@ -448,10 +481,13 @@ const App = {
     this.running = false;
     for (const [k, s] of Object.entries(this.stageState)) if (s.status === 'running' || s.status === 'queued') this.stageState[k] = { status: s.status === 'running' ? 'failed' : 'idle', note: r.signal ? 'stopped' : '' };
     const failed = Object.entries(this.stageState).find(([, s]) => s.status === 'failed');
-    const msg = r.signal ? 'Run stopped' : failed ? `${STAGES.find((s) => s.id === failed[0]).title} failed — see the Output panel` : `Done in ${Fmt.secs((Date.now() - this.runStart) / 1000)}`;
-    this.output.push({ kind: failed ? 'error' : 'event', text: (failed ? '✖ ' : '✔ ') + msg });
+    const issues = !r.signal && !failed ? this.runIssues || [] : [];
+    const msg = r.signal ? 'Run stopped' : failed ? `${STAGES.find((s) => s.id === failed[0]).title} failed — see the Output panel`
+      : issues.length ? `Done in ${Fmt.secs((Date.now() - this.runStart) / 1000)}, with sign-off errors — ${issues.join('; ')}` : `Done in ${Fmt.secs((Date.now() - this.runStart) / 1000)}`;
+    this.output.push({ kind: failed || issues.length ? 'error' : 'event', text: (failed || issues.length ? '✖ ' : '✔ ') + msg });
     this.appendOutput([this.output[this.output.length - 1]]);
-    showToast(msg, 4000);
+    showToast(msg, issues.length ? 8000 : 4000);
+    this.runIssues = [];
     const ran = this.stageState;
     this.loadRunState();
     // keep this run's times and failures; the files only tell which stages have results
@@ -566,22 +602,24 @@ const App = {
           CORNERS.map(([v, l]) => h('option', { value: v, selected: v === c.corner }, l)))),
         this.tools && this.tools.pdk ? h('div', { class: 'set-hint mono wrap' }, Paths.tilde(this.tools.pdk.pdk_dir)) : null));
     scroll.append(h('div', { class: 'pad-x', style: 'padding-top:12px' },
-      h('button', { class: 'vs-button full', disabled: this.running || !c.top, onclick: () => this.run('synth', 'gds') }, icon('play'), 'Run Full Flow'),
+      h('button', { class: 'vs-button full', disabled: this.running || !c.top, onclick: () => this.run('synth', LAST_STAGE) }, icon('play'), 'Run Full Flow'),
       h('div', { style: 'height:6px' }),
-      h('button', { class: 'vs-button secondary full', disabled: this.running || !c.top, onclick: () => this.run('synth', 'synth') }, icon('symbol-structure'), 'Synthesis Only')));
+      h('button', { class: 'vs-button secondary full', disabled: this.running || !c.top, onclick: () => this.run('synth', 'synth') }, icon('symbol-structure'), 'Synthesis Only'),
+      h('div', { style: 'height:6px' }),
+      h('button', { class: 'vs-button secondary full', disabled: this.running || !this.signoffReady(), title: this.signoffReady() ? 'Full DRC (KLayout, Magic) and LVS (Magic, netgen) of the GDS' : 'Needs the GDS: run the full flow first', onclick: () => this.runSignoff() }, icon('checklist'), 'Run DRC + LVS')));
     scroll.append(h('div', { class: 'sidebar-foot' }, 'Settings are saved in ', h('span', { class: 'mono' }, 'hdlphy.json'), ', results in ', h('span', { class: 'link mono', onclick: () => this.runDir() && Host.openPath(this.runDir()) }, PathUtil.join('hdlphy_run', c.top || '…'))));
   },
 
   renderFlow() {
     const sb = this.sidebarEl;
     sb.append(h('div', { class: 'sb-title' }, 'FLOW', h('div', { class: 'grow' }),
-      h('button', { class: 'icon-btn', title: 'Run all stages', onclick: () => this.run('synth', 'gds') }, icon('run-all'))));
+      h('button', { class: 'icon-btn', title: 'Run all stages', onclick: () => this.run('synth', LAST_STAGE) }, icon('run-all'))));
     const scroll = h('div', { class: 'scroll' });
     sb.append(scroll);
     if (!this.project) { scroll.append(h('div', { class: 'dim-pad' }, 'Open a design first.')); return; }
     STAGES.forEach((s, i) => {
       const st = this.stageState[s.id] || { status: 'idle' };
-      const ic = { running: 'loading spin', done: 'pass-filled', failed: 'error', queued: 'circle-large-outline', idle: 'circle-large-outline' }[st.status] || 'circle-large-outline';
+      const ic = st.status === 'done' && st.warn ? 'warning warn-icon' : { running: 'loading spin', done: 'pass-filled', failed: 'error', queued: 'circle-large-outline', idle: 'circle-large-outline' }[st.status] || 'circle-large-outline';
       const prevDone = i === 0 || (this.stageState[STAGES[i - 1].id] || {}).status === 'done';
       const row = h('div', { class: 'stage-row ' + st.status },
         h('span', { class: `codicon codicon-${ic} stage-icon` }),
@@ -589,13 +627,15 @@ const App = {
           h('div', { class: 'stage-name' }, s.title, h('span', { class: 'dim small' }, ' · ' + s.tool)),
           h('div', { class: 'dim small' }, st.status === 'running' ? 'Running…' : st.status === 'failed' ? (st.note === 'stopped' ? 'Stopped' : 'Failed') : st.status === 'done' ? this.stageSummary(s.id, st) : s.desc)),
         h('button', { class: 'icon-btn hover-only', title: `Run ${s.title} only`, disabled: this.running || !prevDone, onclick: () => this.run(s.id, s.id) }, icon('play')),
-        h('button', { class: 'icon-btn hover-only', title: `Run from ${s.title} to the end`, disabled: this.running || !prevDone, onclick: () => this.run(s.id, 'gds') }, icon('run-all')),
+        h('button', { class: 'icon-btn hover-only', title: `Run from ${s.title} to the end`, disabled: this.running || !prevDone, onclick: () => this.run(s.id, LAST_STAGE) }, icon('run-all')),
         h('button', { class: 'icon-btn hover-only', title: 'Show the log', onclick: () => this.showLog(s.id) }, icon('output')));
       scroll.append(row);
     });
     scroll.append(h('div', { class: 'pad-x', style: 'padding-top:12px' },
       this.running ? h('button', { class: 'vs-button full', style: 'background:var(--error)', onclick: () => this.stop() }, icon('debug-stop'), 'Stop')
-        : h('button', { class: 'vs-button full', onclick: () => this.run('synth', 'gds') }, icon('play'), 'Run Full Flow')));
+        : [h('button', { class: 'vs-button full', onclick: () => this.run('synth', LAST_STAGE) }, icon('play'), 'Run Full Flow'),
+          h('div', { style: 'height:6px' }),
+          h('button', { class: 'vs-button secondary full', disabled: !this.signoffReady(), title: this.signoffReady() ? 'Full DRC and LVS of the GDS' : 'Needs the GDS: run the full flow first', onclick: () => this.runSignoff() }, icon('checklist'), 'Run DRC + LVS')]));
     scroll.append(h('div', { class: 'sidebar-foot' }, 'Each stage reads the previous stage\'s result, so a stage can be re-run after changing its settings. Logs: ',
       h('span', { class: 'link mono', onclick: () => this.runDir() && Host.openPath(PathUtil.join(this.runDir(), 'logs')) }, 'logs/')));
   },
@@ -607,8 +647,17 @@ const App = {
     if (id === 'floorplan' && m.floorplan) return `${Fmt.num(m.floorplan.die_width_um, 1)} × ${Fmt.num(m.floorplan.die_height_um, 1)} µm · ${t}`;
     if (id === 'place' && m.place) return `WNS ${Fmt.num(m.place.place_wns, 3)} ns · ${t}`;
     if (id === 'cts' && m.cts) return (m.synth && m.synth.has_clock === false ? 'no clock · ' : '') + `WNS ${Fmt.num(m.cts.cts_wns, 3)} ns · ${t}`;
-    if (id === 'route' && m.route) return `${Fmt.num(m.route.drc_violations, 0)} DRC · ${Fmt.num(m.route.wirelength_um, 0)} µm wire · ${t}`;
+    if (id === 'route' && m.route) return `${Fmt.num(m.route.drc_violations, 0)} router DRC · ${Fmt.num(m.route.wirelength_um, 0)} µm wire · ${t}`;
     if (id === 'gds' && m.gds) return `${Fmt.num(m.gds.gds_bytes / 1024, 0)} KiB · ${t}`;
+    if (id === 'drc' && m.drc) {
+      const n = Number(m.drc.drc_klayout) + Number(m.drc.drc_magic);
+      return h('span', { class: n ? 'bad' : '' }, n ? `${Fmt.num(m.drc.drc_klayout, 0)} KLayout · ${Fmt.num(m.drc.drc_magic, 0)} Magic violations · ${t}` : `Clean (KLayout, Magic) · ${t}`);
+    }
+    if (id === 'lvs' && m.lvs) {
+      const ok = Number(m.lvs.lvs_match) === 1;
+      return h('span', { class: ok ? '' : 'bad' }, ok ? `Match · ${Fmt.num(m.lvs.lvs_layout_devices, 0)} devices, ${Fmt.num(m.lvs.lvs_layout_nets, 0)} nets · ${t}`
+        : `Mismatch · ${(m.lvs.lvs_split_pins || []).length ? m.lvs.lvs_split_pins.join(', ') + ' on unconnected metal' : m.lvs.lvs_bad_nets + ' bad nets'} · ${t}`);
+    }
     return t;
   },
 
@@ -639,10 +688,29 @@ const App = {
         row('Worst setup slack', `${Fmt.num(final[prefix + '_wns'], 3)} ns`, slackCls(final[prefix + '_wns'])),
         row('Worst hold slack', `${Fmt.num(final[prefix + '_whs'], 3)} ns`, slackCls(final[prefix + '_whs'])),
         row('Total negative slack', `${Fmt.num(final[prefix + '_tns'], 3)} ns`, slackCls(final[prefix + '_tns'])));
-      if (m.route) scroll.append(row('Wire length', `${Fmt.num(r.wirelength_um, 0)} µm`), row('DRC violations', Fmt.num(r.drc_violations, 0), Number(r.drc_violations) > 0 ? 'bad' : 'good'), row('Power (est.)', Fmt.power(r.power_total_w)));
+      if (m.route) scroll.append(row('Wire length', `${Fmt.num(r.wirelength_um, 0)} µm`), row('Router DRC', Fmt.num(r.drc_violations, 0), Number(r.drc_violations) > 0 ? 'bad' : 'good'), row('Power (est.)', Fmt.power(r.power_total_w)));
       if (m.route && r.pdn_vpwr_connected != null) {
         const pgOk = Number(r.pdn_vpwr_connected) === 1 && Number(r.pdn_vgnd_connected) === 1 && Number(r.pg_unconnected_pins) === 0;
         scroll.append(row('Power grid', pgOk ? 'VPWR, VGND connected' : `${Fmt.num(r.pg_unconnected_pins, 0)} open cell pins${Number(r.pdn_vpwr_connected) === 1 && Number(r.pdn_vgnd_connected) === 1 ? '' : ', grid not connected'}`, pgOk ? 'good' : 'bad'));
+      }
+    }
+    if (m.drc || m.lvs) {
+      scroll.append(this.section('SIGN-OFF'));
+      if (m.drc) {
+        const d = m.drc;
+        // each engine's count, then its most frequent rules
+        const rules = (byRule) => Object.entries(byRule || {}).sort((a, b) => b[1] - a[1]).slice(0, 5)
+          .map(([k, v]) => h('div', { class: 'kv-row', style: 'padding-left:28px' }, h('span', { class: 'dim small ellipsis', title: k }, k), h('span', { class: 'mono small bad' }, v)));
+        scroll.append(row('DRC, KLayout', Fmt.num(d.drc_klayout, 0), Number(d.drc_klayout) ? 'bad' : 'good'), ...rules(d.drc_klayout_rules),
+          row('DRC, Magic', Fmt.num(d.drc_magic, 0), Number(d.drc_magic) ? 'bad' : 'good'), ...rules(d.drc_magic_rules));
+      }
+      if (m.lvs) {
+        const l = m.lvs, ok = Number(l.lvs_match) === 1;
+        scroll.append(row('LVS', ok ? 'Match' : 'Mismatch', ok ? 'good' : 'bad'),
+          row('Devices (layout / netlist)', `${Fmt.num(l.lvs_layout_devices, 0)} / ${Fmt.num(l.lvs_source_devices, 0)}`, l.lvs_layout_devices === l.lvs_source_devices ? '' : 'bad'),
+          row('Nets (layout / netlist)', `${Fmt.num(l.lvs_layout_nets, 0)} / ${Fmt.num(l.lvs_source_nets, 0)}`, l.lvs_layout_nets === l.lvs_source_nets ? '' : 'bad'));
+        if (!ok) scroll.append(row('Bad nets / devices / pins', `${l.lvs_bad_nets} / ${l.lvs_bad_devices} / ${l.lvs_pin_mismatches}`, 'bad'));
+        if ((l.lvs_split_pins || []).length) scroll.append(row('Pins on unconnected metal', l.lvs_split_pins.join(', '), 'bad'));
       }
     }
     const rep = this.runDir() && PathUtil.join(this.runDir(), 'reports');
@@ -712,7 +780,7 @@ const App = {
       s.append(h('span', { class: 'sb-item' }, h('span', { class: 'codicon codicon-loading spin' }), cur ? cur.title + '…' : 'Starting…'));
     } else if (this.exporting) s.append(h('span', { class: 'sb-item' }, h('span', { class: 'codicon codicon-loading spin' }), 'Exporting layout…'));
     s.append(h('span', { class: 'sb-spacer' }));
-    if (t) s.append(tool('yosys', 'yosys'), tool('openroad', 'OpenROAD'), tool('klayout', 'KLayout'));
+    if (t) s.append(tool('yosys', 'yosys'), tool('openroad', 'OpenROAD'), tool('klayout', 'KLayout'), tool('magic', 'Magic'), tool('netgen', 'netgen'));
   },
 
   // ---------------------------------------------------------------- menus, settings, keys
@@ -720,7 +788,9 @@ const App = {
   stageMenu(e) {
     if (!this.project) return;
     Menus.popup([{ type: 'header', label: 'Run one stage' }, ...STAGES.map((s, i) => ({ label: s.title, enabled: !this.running && (i === 0 || (this.stageState[STAGES[i - 1].id] || {}).status === 'done'), action: () => this.run(s.id, s.id) })),
-      { type: 'separator' }, { label: 'Synthesis Only', enabled: !this.running, action: () => this.run('synth', 'synth') }, { label: 'Up to Routing (no GDS)', enabled: !this.running, action: () => this.run('synth', 'route') }], e);
+      { type: 'separator' }, { label: 'Synthesis Only', enabled: !this.running, action: () => this.run('synth', 'synth') }, { label: 'Up to Routing (no GDS)', enabled: !this.running, action: () => this.run('synth', 'route') },
+      { label: 'Up to GDS (no DRC, LVS)', enabled: !this.running, action: () => this.run('synth', 'gds') },
+      { label: 'DRC + LVS', accelerator: 'F6', enabled: !this.running && this.signoffReady(), action: () => this.runSignoff() }], e);
   },
 
   appMenu(e) {
@@ -731,7 +801,8 @@ const App = {
       { label: 'Open Recent', submenu: recent.length ? recent.map((p) => ({ label: Paths.tilde(p), action: () => this.openPaths([p]) })) : [{ label: 'None', enabled: false }] },
       { label: 'Open Example', action: () => this.openExample() },
       { type: 'separator' },
-      { label: 'Run Full Flow', accelerator: 'F5', enabled: !this.running && !!this.project, action: () => this.run('synth', 'gds') },
+      { label: 'Run Full Flow', accelerator: 'F5', enabled: !this.running && !!this.project, action: () => this.run('synth', LAST_STAGE) },
+      { label: 'Run DRC + LVS', accelerator: 'F6', enabled: !this.running && this.signoffReady(), action: () => this.runSignoff() },
       { label: 'Stop', enabled: this.running, action: () => this.stop() },
       { type: 'separator' },
       { label: 'Schematic', accelerator: 'Ctrl+1', action: () => this.showTab('schematic') },
@@ -788,7 +859,7 @@ const App = {
   onKey(e) {
     const mod = IS_MAC ? e.metaKey : e.ctrlKey;
     if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
-    if (mod && e.key === 'o') { e.preventDefault(); this.openFolderDialog(); } else if (mod && e.key === '1') { e.preventDefault(); this.showTab('schematic'); } else if (mod && e.key === '2') { e.preventDefault(); this.showTab('layout'); } else if (mod && e.key === ',') { e.preventDefault(); this.openSettings(); } else if (mod && e.key === 'q') { e.preventDefault(); this.requestClose(); } else if (e.key === 'F5') { e.preventDefault(); if (!this.running) this.run('synth', 'gds'); }
+    if (mod && e.key === 'o') { e.preventDefault(); this.openFolderDialog(); } else if (mod && e.key === '1') { e.preventDefault(); this.showTab('schematic'); } else if (mod && e.key === '2') { e.preventDefault(); this.showTab('layout'); } else if (mod && e.key === ',') { e.preventDefault(); this.openSettings(); } else if (mod && e.key === 'q') { e.preventDefault(); this.requestClose(); } else if (e.key === 'F5') { e.preventDefault(); if (!this.running) this.run('synth', LAST_STAGE); } else if (e.key === 'F6') { e.preventDefault(); this.runSignoff(); }
   },
 
   requestClose() {

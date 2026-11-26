@@ -8,9 +8,12 @@ Stages (each one reads the previous stage's result from <run>/results):
   cts        OpenROAD: clock tree (skipped when the design has no clock), hold repair
   route      OpenROAD: global + detailed routing, filler cells, timing/area/power reports
   gds        KLayout: DEF + cell GDS -> final.gds, plus the geometry file the Layout tab draws
+  drc        full DRC of final.gds: KLayout with the PDK's sky130A_mr.drc deck (front end, back end, off-grid)
+             and Magic with its drc(full) rules
+  lvs        Magic extracts final.gds to SPICE, netgen compares it with the power-aware netlist (final_pg.v)
 
 Usage:
-  hdlphy_flow.py run CONFIG.json [--from STAGE] [--to STAGE]
+  hdlphy_flow.py run CONFIG.json [--from STAGE] [--to STAGE]   # exit code 3: DRC violations or LVS mismatch
   hdlphy_flow.py view CONFIG.json STAGE     # layout view of an intermediate stage (floorplan/place/cts/route)
   hdlphy_flow.py check [CONFIG.json]        # tools and PDK files that would be used (JSON)
   hdlphy_flow.py example OUT_DIR            # writes a config for examples/counter.v
@@ -34,9 +37,10 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.join(HERE, 'scripts')
 KLAYOUT_SCRIPTS = os.path.join(HERE, 'klayout')
-STAGES = ['synth', 'floorplan', 'place', 'cts', 'route', 'gds']
+STAGES = ['synth', 'floorplan', 'place', 'cts', 'route', 'gds', 'drc', 'lvs']
 STAGE_TITLES = {'synth': 'Synthesis', 'floorplan': 'Floorplan', 'place': 'Placement', 'cts': 'Clock Tree',
-                'route': 'Routing', 'gds': 'GDS'}
+                'route': 'Routing', 'gds': 'GDS', 'drc': 'DRC', 'lvs': 'LVS'}
+TOOLS = ('yosys', 'openroad', 'klayout', 'magic', 'netgen')
 HOME = os.path.expanduser('~')
 
 DEFAULTS = {
@@ -106,6 +110,11 @@ def pdk_files(cfg):
         'lyp': os.path.join(tech, 'klayout', 'tech', cfg['pdk'] + '.lyp'),
         'lyt': os.path.join(tech, 'klayout', 'tech', cfg['pdk'] + '.lyt'),
         'layer_map': os.path.join(tech, 'klayout', 'tech', cfg['pdk'] + '.map'),
+        # sign-off: KLayout DRC deck, Magic technology, netgen LVS setup, transistor-level cell netlists
+        'drc_deck': os.path.join(tech, 'klayout', 'drc', cfg['pdk'] + '_mr.drc'),
+        'magicrc': os.path.join(tech, 'magic', cfg['pdk'] + '.magicrc'),
+        'netgen_setup': os.path.join(tech, 'netgen', cfg['pdk'] + '_setup.tcl'),
+        'cell_spice': os.path.join(ref, 'spice', scl + '.spice'),
     }
     return f
 
@@ -160,9 +169,9 @@ def plain_liberty(cfg, files, p):
     return out
 
 
-def run_tool(stage, args, log_path, env=None, cwd=None):
+def run_tool(stage, args, log_path, env=None, cwd=None, append=False):
     """Runs a tool, echoing its output and keeping it in the stage log. Returns the exit code."""
-    with open(log_path, 'w') as log:
+    with open(log_path, 'a' if append else 'w') as log:
         log.write('$ ' + ' '.join(args) + '\n')
         log.flush()
         try:
@@ -567,22 +576,274 @@ def stage_gds(cfg, files, p, tools):
     return ok
 
 
+# ---------------------------------------------------------------- sign-off: DRC and LVS
+
+def tcl_str(s):
+    """A Tcl word for a path or name: braced, so spaces and $ need no escaping."""
+    return '{' + str(s) + '}'
+
+
+def fresh_dir(path):
+    if os.path.isdir(path):
+        shutil.rmtree(path)
+    os.makedirs(path)
+    return path
+
+
+def magic_env(cfg):
+    env = dict(os.environ)
+    env['PDK_ROOT'] = os.path.expanduser(cfg['pdk_root'])   # the PDK's magicrc loads the tech file from $PDK_ROOT
+    env['PDK'] = cfg['pdk']
+    env.pop('MAGTYPE', None)
+    return env
+
+
+def need_files(files, keys):
+    for k in keys:
+        if not os.path.isfile(files[k]):
+            die('PDK file not found: ' + files[k])
+
+
+def lyrdb_counts(path):
+    """Violation count per rule in a KLayout report database."""
+    import xml.etree.ElementTree as ET
+    counts = {}
+    items = ET.parse(path).getroot().find('items')
+    for item in (items if items is not None else []):
+        rule = (item.findtext('category') or '?').strip().strip("'")
+        counts[rule] = counts.get(rule, 0) + 1
+    return counts
+
+
+def stage_drc(cfg, files, p, tools):
+    """Full DRC of final.gds with both engines the open SKY130 flows sign off with."""
+    for t in ('klayout', 'magic'):
+        if not tools[t]:
+            die('%s not found (needed for DRC)' % t)
+    need_files(files, ('drc_deck', 'magicrc'))
+    top, gds = cfg['top'], os.path.join(p['results'], 'final.gds')
+    log = os.path.join(p['logs'], '7_drc.log')
+    m = {}
+    # KLayout: the PDK's deck. Its sections default to off, so each one is switched on here.
+    lyrdb = os.path.join(p['reports'], 'drc_klayout.lyrdb')
+    env = dict(os.environ)
+    env.pop('KLAYOUT_PATH', None)
+    args = [tools['klayout'], '-b', '-r', files['drc_deck'], '-rd', 'input=' + gds, '-rd', 'top_cell=' + top,
+            '-rd', 'report=' + lyrdb, '-rd', 'feol=true', '-rd', 'beol=true', '-rd', 'offgrid=true',
+            '-rd', 'floating_met=false', '-rd', 'seal=false', '-rd', 'thr=%d' % int(cfg['threads'])]
+    emit('log', stage='drc', text='KLayout DRC: %s (front end, back end, off-grid)' % os.path.basename(files['drc_deck']))
+    rc = run_tool('drc', args, log, env=env)
+    if rc != 0 or not os.path.isfile(lyrdb):
+        emit('log', stage='drc', text='KLayout DRC did not finish (exit code %d)' % rc)
+        return False
+    kl = lyrdb_counts(lyrdb)
+    m['drc_klayout'] = sum(kl.values())
+    m['drc_klayout_rules'] = kl
+    # Magic: its full rule set, on the whole hierarchy
+    work = fresh_dir(os.path.join(p['tmp'], 'drc'))
+    rpt = os.path.join(p['reports'], 'drc_magic.rpt')
+    script = os.path.join(work, 'drc.tcl')
+    with open(script, 'w') as fh:
+        fh.write('\n'.join([
+            '# Written by HDLPhy: Magic DRC of the final GDS',
+            'gds read %s' % tcl_str(gds),
+            'load %s' % tcl_str(top),
+            'select top cell',
+            'drc euclidean on',
+            'drc style drc(full)',
+            'drc check',
+            'drc catchup',
+            'set um [cif scale out]',
+            'set total 0',
+            'set fh [open %s w]' % tcl_str(rpt),
+            'puts $fh "Magic DRC, style drc(full), top cell %s"' % top,
+            'foreach {why boxes} [drc listall why] {',
+            '  incr total [llength $boxes]',
+            '  puts "##HDLPHY-DRC [llength $boxes] $why"',
+            '  puts $fh "\n$why: [llength $boxes]"',
+            '  foreach b [lrange $boxes 0 49] {',
+            '    puts $fh [format "  %.3f %.3f %.3f %.3f um" {*}[lmap v $b {expr {$v * $um}}]]',
+            '  }',
+            '}',
+            'puts $fh "\nTotal: $total"',
+            'close $fh',
+            'puts "##HDLPHY-DRC-TOTAL $total"',
+            'quit -noprompt', '']))
+    emit('log', stage='drc', text='Magic DRC: drc(full)')
+    rc = run_tool('drc', [tools['magic'], '-dnull', '-noconsole', '-rcfile', files['magicrc'], script], log,
+                  env=magic_env(cfg), cwd=work, append=True)
+    out = open(log, errors='replace').read()
+    total = re.findall(r'^##HDLPHY-DRC-TOTAL (\d+)', out, re.M)
+    if rc != 0 or not total:
+        emit('log', stage='drc', text='Magic DRC did not finish (exit code %d)' % rc)
+        return False
+    m['drc_magic'] = int(total[-1])
+    m['drc_magic_rules'] = {why.strip(): int(n) for n, why in re.findall(r'^##HDLPHY-DRC (\d+) (.*)$', out, re.M)}
+    m['drc_clean'] = 1 if m['drc_klayout'] == 0 and m['drc_magic'] == 0 else 0
+    # one summary for both engines
+    lines = ['DRC of %s (top cell %s)' % (gds, top), '',
+             'KLayout, %s (feol, beol, offgrid): %d' % (os.path.basename(files['drc_deck']), m['drc_klayout'])]
+    lines += ['  %-24s %d' % (k, v) for k, v in sorted(kl.items(), key=lambda kv: -kv[1])]
+    lines += ['', 'Magic, drc(full): %d' % m['drc_magic']]
+    lines += ['  %-48s %d' % (k, v) for k, v in sorted(m['drc_magic_rules'].items(), key=lambda kv: -kv[1])]
+    lines += ['', 'Locations: drc_klayout.lyrdb (open it in KLayout with the GDS) and drc_magic.rpt.']
+    with open(os.path.join(p['reports'], 'signoff_drc.rpt'), 'w') as fh:
+        fh.write('\n'.join(lines) + '\n')
+    emit('artifact', stage='drc', kind='drc', path=lyrdb)
+    save_metrics(p, 'drc', m)
+    return True
+
+
+def stage_lvs(cfg, files, p, tools):
+    """LVS: Magic extracts the devices and nets of final.gds, netgen compares them with final_pg.v, whose
+    standard cells netgen reads from the PDK's transistor-level netlists (fill and tap cells are ignored)."""
+    for t in ('magic', 'netgen'):
+        if not tools[t]:
+            die('%s not found (needed for LVS)' % t)
+    need_files(files, ('magicrc', 'netgen_setup', 'cell_spice'))
+    top = cfg['top']
+    gds, pg = os.path.join(p['results'], 'final.gds'), os.path.join(p['results'], 'final_pg.v')
+    if not os.path.isfile(pg):
+        die('LVS needs the power-aware netlist final_pg.v; run Routing again')
+    log = os.path.join(p['logs'], '8_lvs.log')
+    work = fresh_dir(os.path.join(p['tmp'], 'lvs'))
+    spice = os.path.join(p['results'], 'extracted.spice')
+    if os.path.isfile(spice):
+        os.remove(spice)
+    script = os.path.join(work, 'extract.tcl')
+    with open(script, 'w') as fh:
+        fh.write('\n'.join([
+            '# Written by HDLPhy: Magic extraction of the final GDS for LVS',
+            'gds read %s' % tcl_str(gds),
+            'load %s' % tcl_str(top),
+            'select top cell',
+            'extract do local',
+            'extract no capacitance', 'extract no coupling', 'extract no resistance', 'extract no adjust',
+            '# no joining of nets by label name: an open net must show up as an LVS error',
+            'extract unique',
+            'extract all',
+            'feedback save %s' % tcl_str(os.path.join(work, 'extract_feedback.txt')),
+            'ext2spice lvs',
+            'ext2spice -o %s %s' % (tcl_str(spice), tcl_str(top + '.ext')),
+            'quit -noprompt', '']))
+    emit('log', stage='lvs', text='Magic: extracting final.gds')
+    rc = run_tool('lvs', [tools['magic'], '-dnull', '-noconsole', '-rcfile', files['magicrc'], script], log,
+                  env=magic_env(cfg), cwd=work)
+    if rc != 0 or not os.path.isfile(spice):
+        emit('log', stage='lvs', text='Magic extraction did not finish (exit code %d)' % rc)
+        return False
+    m = {}
+    w = re.findall(r'^Total of (\d+) warnings', open(log, errors='replace').read(), re.M)
+    m['lvs_extract_warnings'] = int(w[-1]) if w else 0
+    rpt = os.path.join(p['reports'], 'lvs.rpt')
+    js = os.path.join(p['reports'], 'lvs.json')
+    for f in (rpt, js):
+        if os.path.isfile(f):
+            os.remove(f)
+    nscript = os.path.join(work, 'lvs.tcl')
+    with open(nscript, 'w') as fh:
+        fh.write('\n'.join([
+            '# Written by HDLPhy: netgen LVS, layout (extracted) vs. source (final_pg.v)',
+            'set layout [readnet spice %s]' % tcl_str(spice),
+            'set source [readnet verilog /dev/null]',
+            'readnet spice %s $source' % tcl_str(files['cell_spice']),
+            'readnet verilog %s $source' % tcl_str(pg),
+            'lvs "$layout %s" "$source %s" %s %s -json' % (top, top, tcl_str(files['netgen_setup']), tcl_str(rpt)),
+            '']))
+    emit('log', stage='lvs', text='netgen: layout vs. final_pg.v')
+    rc = run_tool('lvs', [tools['netgen'], '-batch', 'source', nscript], log, cwd=work, append=True)
+    if rc != 0 or not os.path.isfile(rpt):
+        emit('log', stage='lvs', text='netgen did not finish (exit code %d)' % rc)
+        return False
+    text = open(rpt, errors='replace').read()
+    final = re.findall(r'^Final result:\s*(.*)$', text, re.M)
+    m['lvs_result'] = final[-1].strip() if final else 'no result'
+    prop_errors = 'Property errors were found' in text
+    bad_nets = bad_devices = pin_mm = 0
+    try:
+        circuits = json.load(open(js))
+        topc = [c for c in circuits if c.get('name') == [top, top]] or circuits[-1:]
+        c = topc[-1]
+        bad_nets, bad_devices = len(c.get('badnets', [])), len(c.get('badelements', []))
+        pins = c.get('pins') or [[], []]
+        pin_mm = sum(1 for a, b in zip(*pins) if '(no matching pin)' in (a, b))
+        devs = c.get('devices') or [[], []]
+        m['lvs_layout_devices'] = sum(n for _, n in devs[0]) if devs else 0
+        m['lvs_source_devices'] = sum(n for _, n in devs[1]) if len(devs) > 1 else 0
+        nets = c.get('nets') or [0, 0]
+        m['lvs_layout_nets'], m['lvs_source_nets'] = nets[0], nets[1]
+    except (OSError, ValueError, KeyError, IndexError, TypeError) as e:
+        emit('log', stage='lvs', text='could not read %s: %s' % (js, e))
+        bad_nets = bad_devices = pin_mm = -1
+    # netgen leaves pins that connect to no device out of lvs.json and still reports a match, but lists them
+    # in the text report as "(no matching pin)": count them from there
+    pin_mm = max(pin_mm, len(re.findall(r'\(no matching pin\)', text)))
+    # "extract unique" renames a label found on pieces of metal that are not connected to each other to
+    # NAME_uqN: e.g. a power strap cut off from the rest of VPWR, whose pin then powers nothing
+    split = sorted({mm.group(1) for port in top_ports(spice, top) for mm in [re.match(r'^(.+)_uq\d+$', port)] if mm})
+    m.update({'lvs_bad_nets': bad_nets, 'lvs_bad_devices': bad_devices, 'lvs_pin_mismatches': pin_mm,
+              'lvs_property_errors': 1 if prop_errors else 0, 'lvs_split_pins': split})
+    if split:
+        emit('log', stage='lvs', text='pins labelled on unconnected pieces of metal: ' + ', '.join(split))
+    m['lvs_match'] = 1 if ('match uniquely' in m['lvs_result'] and not prop_errors
+                           and bad_nets == 0 and bad_devices == 0 and pin_mm == 0 and not split) else 0
+    emit('artifact', stage='lvs', kind='lvs', path=rpt)
+    save_metrics(p, 'lvs', m)
+    return True
+
+
+def top_ports(spice, top):
+    """Port names of the top cell's .subckt line (with its + continuation lines) in a SPICE netlist."""
+    ports, on = [], False
+    for line in open(spice, errors='replace'):
+        words = line.split()
+        if not on and len(words) >= 2 and words[0].lower() == '.subckt' and words[1] == top:
+            ports, on = words[2:], True
+        elif on and words and words[0] == '+':
+            ports += words[1:]
+        elif on:
+            break
+    return [w for w in ports if '=' not in w]
+
+
+def signoff_issue(p, stage):
+    """What a finished DRC or LVS stage found, as one line (None when clean or for other stages)."""
+    if stage not in ('drc', 'lvs'):
+        return None
+    try:
+        m = json.load(open(os.path.join(p['reports'], 'metrics.json'))).get(stage, {})
+    except (OSError, ValueError):
+        return None
+    if stage == 'drc' and m and not m.get('drc_clean'):
+        return 'DRC: %d violations from KLayout, %d from Magic (reports/signoff_drc.rpt)' % (
+            m.get('drc_klayout', 0), m.get('drc_magic', 0))
+    if stage == 'lvs' and m and not m.get('lvs_match'):
+        split = m.get('lvs_split_pins') or []
+        return 'LVS: %s, %s bad nets, %s bad devices, %s unmatched pins%s (reports/lvs.rpt)' % (
+            'mismatch' if 'match uniquely' in m.get('lvs_result', '') else m.get('lvs_result', '?').rstrip('.'),
+            m.get('lvs_bad_nets'), m.get('lvs_bad_devices'), m.get('lvs_pin_mismatches'),
+            ', %s labelled on unconnected pieces' % ', '.join(split) if split else '')
+    return None
+
+
 # ---------------------------------------------------------------- driver
 
 def check(cfg):
     files = pdk_files(cfg)
-    tools = {t: find_tool(t, cfg) for t in ('yosys', 'openroad', 'klayout')}
+    tools = {t: find_tool(t, cfg) for t in TOOLS}
     versions = {}
     for t, exe in tools.items():
         if not exe:
             continue
         try:
-            arg = {'yosys': ['-V'], 'openroad': ['-version'], 'klayout': ['-v']}[t]
+            arg = {'yosys': ['-V'], 'openroad': ['-version'], 'klayout': ['-v'], 'magic': ['--version'],
+                   'netgen': ['-batch', 'quit']}[t]
             out = subprocess.run([exe] + arg, capture_output=True, text=True, timeout=20).stdout.strip()
             versions[t] = out.splitlines()[0] if out else ''
         except (OSError, subprocess.SubprocessError):
             versions[t] = ''
-    missing = [k for k in ('tech_lef', 'cell_lef', 'cell_gds', 'tracks', 'lyp', 'layer_map') if not os.path.isfile(files[k])]
+    missing = [k for k in ('tech_lef', 'cell_lef', 'cell_gds', 'tracks', 'lyp', 'layer_map', 'drc_deck', 'magicrc',
+                           'netgen_setup', 'cell_spice') if not os.path.isfile(files[k])]
     if not (os.path.isfile(files['lib_gz']) or os.path.isfile(files['lib_plain'])):
         missing.append('lib')
     return {'tools': tools, 'versions': versions, 'pdk': files, 'missing_pdk_files': missing,
@@ -599,6 +860,8 @@ STAGE_OUTPUTS = {
     'route': ['results/5_route.odb', 'results/5_route.def', 'results/final.def', 'results/final.v', 'results/final_pg.v',
               'reports/drc.rpt', 'reports/timing_setup.rpt', 'reports/timing_hold.rpt', 'reports/power.rpt', 'reports/area.rpt'],
     'gds': ['results/final.gds', 'results/layout.json', 'results/layout.bin'],
+    'drc': ['reports/drc_klayout.lyrdb', 'reports/drc_magic.rpt', 'reports/signoff_drc.rpt'],
+    'lvs': ['results/extracted.spice', 'reports/lvs.rpt', 'reports/lvs.json'],
 }
 
 
@@ -625,14 +888,15 @@ def clean_from(p, start):
 def run(cfg, start, stop):
     p = paths(cfg)
     files = pdk_files(cfg)
-    tools = {t: find_tool(t, cfg) for t in ('yosys', 'openroad', 'klayout')}
+    tools = {t: find_tool(t, cfg) for t in TOOLS}
     funcs = {'synth': stage_synth, 'floorplan': stage_floorplan,
              'place': stage_place,
              'cts': stage_cts, 'route': lambda c, f, pp, t: stage_openroad('route', c, f, pp, t),
-             'gds': stage_gds}
+             'gds': stage_gds, 'drc': stage_drc, 'lvs': stage_lvs}
     i0, i1 = STAGES.index(start), STAGES.index(stop)
     if i0 > 0:
-        need = {'floorplan': 'gate.json', 'place': '2_floorplan.odb', 'cts': '3_place.odb', 'route': '4_cts.odb', 'gds': 'final.def'}[start]
+        need = {'floorplan': 'gate.json', 'place': '2_floorplan.odb', 'cts': '3_place.odb', 'route': '4_cts.odb', 'gds': 'final.def',
+                'drc': 'final.gds', 'lvs': 'final.gds'}[start]
         if not os.path.isfile(os.path.join(p['results'], need)):
             die('%s needs the result of the previous stage (%s); run the earlier stages first' % (STAGE_TITLES[start], need))
     clean_from(p, start)
@@ -650,12 +914,18 @@ def run(cfg, start, stop):
             emit('log', stage=st, text='%s: %s' % (type(e).__name__, e))
             ok = False
         dt = round(time.time() - t0, 2)
-        emit('stage', stage=st, title=STAGE_TITLES[st], status='done' if ok else 'failed', seconds=dt)
+        warn = signoff_issue(p, st) if ok else None
+        emit('stage', stage=st, title=STAGE_TITLES[st], status='done' if ok else 'failed', seconds=dt, warn=warn)
         if not ok:
             emit('finished', ok=False, failed=st)
             return 1
-    emit('finished', ok=True)
-    return 0
+    # the sign-off stages finish even when they find errors (DRC errors do not stop LVS); the run then ends
+    # with the list of what they found
+    issues = [i for i in (signoff_issue(p, st) for st in STAGES[i0:i1 + 1]) if i]
+    for i in issues:
+        emit('log', stage=STAGES[i1], text='sign-off: ' + i)
+    emit('finished', ok=True, issues=issues)
+    return 3 if issues else 0
 
 
 def main(argv):
@@ -678,7 +948,7 @@ def main(argv):
         return 0
     if cmd == 'run':
         cfg = load_config(argv[2])
-        start, stop = 'synth', 'gds'
+        start, stop = 'synth', STAGES[-1]
         rest = argv[3:]
         for i, a in enumerate(rest):
             if a == '--from':
@@ -696,7 +966,7 @@ def main(argv):
             die('view needs one of: ' + ', '.join(names))
         p = paths(cfg)
         files = pdk_files(cfg)
-        tools = {t: find_tool(t, cfg) for t in ('yosys', 'openroad', 'klayout')}
+        tools = {t: find_tool(t, cfg) for t in TOOLS}
         if not os.path.isfile(os.path.join(p['results'], names[st])):
             die('no %s result yet' % st)
         ok = stage_view(cfg, files, p, tools, names[st], 'layout_' + st, False)

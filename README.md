@@ -36,7 +36,7 @@ Buses can be drawn as analog traces: unsigned (0 to 1), signed (−1 to +1) or a
 
 ## HDLPhy
 
-Open a folder of Verilog sources, pick the top module and the clock, and press **Run Flow**. The flow has six stages: synthesis, floorplan, placement, clock tree, routing and GDS.
+Open a folder of Verilog sources, pick the top module and the clock, and press **Run Flow**. The flow has eight stages: synthesis, floorplan, placement, clock tree, routing, GDS, and the sign-off checks DRC (KLayout and Magic) and LVS (Magic and netgen). **Run DRC + LVS** reruns only the checks on the existing GDS.
 
 The two title-bar tabs show the result:
 

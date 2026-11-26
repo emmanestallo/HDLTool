@@ -84,7 +84,7 @@ contextBridge.exposeInMainWorld('host', {
   schematic: (req) => ipcRenderer.invoke('schematic', req),
   cancelSchematic: () => ipcRenderer.invoke('schematic-cancel'),
   readLayout: (p) => ipcRenderer.invoke('read-layout', p),
-  openKLayout: (gds, lyp) => ipcRenderer.invoke('open-klayout', gds, lyp),
+  openKLayout: (gds, lyp, rdb) => ipcRenderer.invoke('open-klayout', gds, lyp, rdb),
   onOpenPaths: (cb) => ipcRenderer.on('open-paths', (_e, paths) => cb(paths)),
   onCloseRequested: (cb) => ipcRenderer.on('close-requested', () => cb()),
 });

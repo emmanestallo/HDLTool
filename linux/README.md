@@ -47,7 +47,7 @@ sudo chown root:root ~/.local/opt/<app>/chrome-sandbox && sudo chmod 4755 ~/.loc
 Open a folder of Verilog files: **Open Folder**, drag it onto the window, or run `hdl-phy <folder>`. Then:
 
 1. In the Design view, tick the source files, pick the top module and the clock port and period. Adjust the floorplan if needed: utilization, aspect ratio, core margin and placement density. Under **Pins**, choose the die edge for the inputs, the outputs and the clock (left, right, top, bottom, or any edge). Left/right pins are on met3, top/bottom pins on met2, and the die grows if an edge is too short for its pins. **Bus order** keeps the bits of each bus together and in index order along the edge: bit 0 at the bottom (left/right edges) or on the left (top/bottom edges), or the reverse.
-2. Press **Run Flow**, or F5. The Flow view shows the stages, and the Output panel streams the tool output:
+2. Press **Run Flow**, or F5. The Flow view shows the stages, and the Output panel streams the tool output. **Run DRC + LVS** (F6, or the checklist button in the title bar) runs only the two sign-off stages on the existing GDS:
 
    | Stage | Tool | Result |
    |---|---|---|
@@ -57,6 +57,8 @@ Open a folder of Verilog files: **Open Folder**, drag it onto the window, or run
    | Clock Tree | OpenROAD | CTS with `clkbuf_4/8/16`, setup/hold repair (skipped without a clock) |
    | Routing | OpenROAD | global and detailed routing on met1–met5, decap/fill cells, power-grid check, timing/power/area reports |
    | GDS | KLayout | `final.gds` (DEF + cell GDS) and the geometry the Layout tab draws |
+   | DRC | KLayout, Magic | full DRC of `final.gds`: the PDK's `sky130A_mr.drc` deck (front end, back end, off-grid) and Magic's `drc(full)` rules |
+   | LVS | Magic, netgen | Magic extracts `final.gds`, netgen compares it with the power-aware netlist `final_pg.v` (cells from the PDK's transistor netlists) |
 
 3. Switch between the two title-bar tabs (Ctrl+1 / Ctrl+2):
    - **Schematic.** The netlist drawn with gate symbols: either **RTL** (elaborated, before mapping) or **Gate level (SKY130)**. Click a cell to see its pins and nets, click a wire to highlight its net, and double-click a submodule to open it.
@@ -66,14 +68,15 @@ Open a folder of Verilog files: **Open Folder**, drag it onto the window, or run
 Settings are kept in `<folder>/hdlphy.json`, and results in `<folder>/hdlphy_run/<top>/`:
 
 - `results/`: netlists, ODB/DEF per stage, `final.gds`;
-- `reports/`: timing, power, area, DRC, `metrics.json`;
+- `reports/`: timing, power, area, router DRC, `metrics.json`; sign-off: `signoff_drc.rpt` (both DRC engines, per rule), `drc_klayout.lyrdb`, `drc_magic.rpt` (locations in µm), `lvs.rpt`, `lvs.json`;
 - `logs/`.
 
 The flow also runs without the app:
 
 ```bash
 python3 HDLPhy/flow/hdlphy_flow.py example /tmp/counter          # writes a config for examples/counter.v
-python3 HDLPhy/flow/hdlphy_flow.py run /tmp/counter/config.json  # synth .. gds
+python3 HDLPhy/flow/hdlphy_flow.py run /tmp/counter/config.json  # synth .. lvs; exit code 3 if DRC or LVS fails
+python3 HDLPhy/flow/hdlphy_flow.py run CONFIG --from drc         # DRC and LVS only
 python3 HDLPhy/flow/hdlphy_flow.py run CONFIG --from place --to route
 python3 HDLPhy/flow/hdlphy_flow.py check                         # which tools and PDK files it uses
 ```
@@ -85,6 +88,8 @@ PDK settings come from the PDK's LibreLane configuration for `sky130_fd_sc_hd`:
 - tap distance, end caps, CTS buffers.
 
 The power-stripe pitch is scaled to the die, because LibreLane's 153 µm pitch is larger than small designs.
+
+DRC and LVS are the open SKY130 sign-off checks, the same ones LibreLane runs. They need Magic and netgen (`~/eda/tools/magic`, `~/eda/tools/netgen`) besides KLayout. LVS also fails when a pin label sits on pieces of metal that are not connected to each other (Magic's `extract unique` names them `VPWR_uq0` and so on), such as a power strap cut off from the grid. netgen alone would still report a match there. DRC errors or an LVS mismatch do not stop the run: both stages finish, the Flow view marks them with a warning, the Reports view lists what they found, and the run ends with the list. The **KLayout** button in the Layout tab opens the GDS with the KLayout DRC markers loaded. Metal density and fill are not checked: they are chip-level checks.
 
 The power grid is a block (macro) grid: met1 rails along the rows, met4 vertical and met5 horizontal stripes, and VPWR/VGND pins on the met4/met5 stripes. There is no core ring and there are no power pins on the die edge. Every stage connects the VPWR/VGND/VPB/VNB pins of the cells it adds, so `final_pg.v` is complete. The routing stage checks the grid (`check_power_grid`) and counts unconnected power pins. The Reports view shows the result as **Power grid**.
 

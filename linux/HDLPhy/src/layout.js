@@ -100,7 +100,7 @@ class LayoutView {
     this.empty.append(icon('layers', 'big-icon'),
       h('div', { class: 'big' }, msg || (running ? 'Place and route is running…' : 'No layout yet')),
       h('div', { class: 'dim' }, detail != null ? detail : 'Run the full flow (synthesis, floorplan, placement, clock tree, routing, GDS) to see the layout.'),
-      !running && this.app.project && !msg ? h('button', { class: 'vs-button', onclick: () => this.app.run('synth', 'gds') }, icon('play'), 'Run Full Flow') : null);
+      !running && this.app.project && !msg ? h('button', { class: 'vs-button', onclick: () => this.app.run('synth', LAST_STAGE) }, icon('play'), 'Run Full Flow') : null);
     this.info.textContent = '';
     this.draw();
   }
@@ -458,7 +458,9 @@ class LayoutView {
     const res = this.results();
     const gds = res && PathUtil.join(res, 'final.gds');
     if (!gds || !Host.fs.exists(gds)) { showToast('No GDS yet: run the flow up to the GDS stage'); return; }
-    Host.openKLayout(gds, this.app.lypPath()).then((r) => { if (!r.ok) showToast(r.error); });
+    // with the DRC markers, when the DRC stage has run
+    const rdb = PathUtil.join(PathUtil.dirname(res), 'reports', 'drc_klayout.lyrdb');
+    Host.openKLayout(gds, this.app.lypPath(), Host.fs.exists(rdb) ? rdb : null).then((r) => { if (!r.ok) showToast(r.error); });
   }
 
   async exportPng() {

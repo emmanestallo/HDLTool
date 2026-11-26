@@ -309,12 +309,13 @@ ipcMain.handle('read-layout', (_e, jsonPath) => {
   }
 });
 
-ipcMain.handle('open-klayout', (_e, gds, lyp) => {
+ipcMain.handle('open-klayout', (_e, gds, lyp, rdb) => {
   const exe = ['/usr/bin/klayout', findOnPath('klayout')].find((p) => p && exists(p));
   if (!exe) return { ok: false, error: 'KLayout was not found.' };
   const args = [];
   if (lyp && exists(lyp)) args.push('-l', lyp);
   args.push(gds);
+  if (rdb && exists(rdb)) args.push('-m', rdb);   // DRC markers: -m loads into the layout view opened before it
   try {
     spawn(exe, args, { detached: true, stdio: 'ignore' }).unref();
     return { ok: true };
